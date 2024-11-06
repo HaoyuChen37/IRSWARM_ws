@@ -46,3 +46,15 @@ conda create --name light python=3.9
 ```bash
 pip install opencv-python -i https://mirrors.aliyun.com/pypi/simple/
 ```
+#### Download ROS
+```bash
+wget http://fishros.com/install -O fishros && . fishros
+```
+
+## Create ROS workspace
+创建工作空间并初始化
+```bash
+mkdir -p 自定义空间名称/src
+cd 自定义空间名称
+catkin_make
+```
