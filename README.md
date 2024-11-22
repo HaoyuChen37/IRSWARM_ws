@@ -1,60 +1,41 @@
 # multi-light-detecting system
-## Initialize raspberry system
-#### Download vscode
-```bash
-sudo apt update
-sudo apt install code
-```
-#### Download vim
-```bash
-sudo apt install vim
-```
-#### Download miniconda
-##### 获取miniconda安装包
-```bash
-wget https://repo.anaconda.com/miniconda/Miniconda3-py37_4.9.2-Linux-aarch64.sh
-```
-##### 安装
-```bash
-bash Miniconda3-py37_4.9.2-Linux-aarch64.sh
-```
-##### 添加环境变量
-
-要在当前用户下使用conda，那么还必须把他的执行路径添加进环境变量。
-```bash
-vim ~/.bashrc
-```
-进入.bashrc文件，如果提示没有vim的话用nano ~/.bashrc也可以。
-
-在文件的最后添加一行：
-```bash
-export PATH="/home/pi/miniconda3/bin:$PATH"
-```
-这里的pi是用户名字
-
-##### 使用
-```bash
-conda list
-```
-
-#### Create miniconda vitual environment
-```bash
-conda create --name light python=3.9
-```
-
-#### Download packages
-```bash
-pip install opencv-python -i https://mirrors.aliyun.com/pypi/simple/
-```
-#### Download ROS
-```bash
-wget http://fishros.com/install -O fishros && . fishros
-```
+## install camera SDK
 
 ## Create ROS workspace
 创建工作空间并初始化
 ```bash
-mkdir -p 自定义空间名称/src
-cd 自定义空间名称
+mkdir -p chy_workspace/src
+cd chy_workspace
 catkin_make
 ```
+进入 src 创建 ros 包并添加依赖
+```bash
+cd src
+catkin_create_pkg mv roscpp rospy std_msgs
+```
+进入 ros 包添加 scripts 目录并编辑 python 文件
+```bash
+cd mv
+mkdir scripts
+cd scripts
+touch mv_con.py
+chmod +x mv_con.py
+```
+
+```bash
+
+mkdir -p chy_workspace/src
+cd chy_workspace
+catkin_make
+
+cd src
+catkin_create_pkg mv roscpp rospy std_msgs
+
+cd mv
+mkdir scripts
+cd scripts
+touch mv_con.py
+chmod +x mv_con.py
+```
+
+
