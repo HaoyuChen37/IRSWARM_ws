@@ -9,6 +9,7 @@ import numpy as np
 import cv2
 import mvsdk
 import platform
+from scipy.io import savemat
 
 class Camera(object):
     def __init__(self, width=1280, height=720, fps=30):
@@ -24,6 +25,12 @@ class Camera(object):
         self.pFrameBuffer = None
         self.shutter = [10000, 5000, 2500, 1250, 625, 312, 156, 78, 39, 19, 9, 5, 2, 1]
         self.fps = fps
+        # paramatars from calibration
+        self.k
+        self.b
+        # store data
+        self.data = []
+        self.true_data = {}
         
     def initialization(self):
     # 枚举相机
@@ -151,6 +158,58 @@ class Camera(object):
 
         # 微调曝光时间
         self.exposure = best_exposure_time
+
+    def mask(frame):
+        # 计算图像的平均像素值
+        mean_val = cv2.mean(frame)[0]
+
+        # 设置阈值为图像平均像素值的2倍
+        threshold = 2 * mean_val
+
+        # 应用阈值来创建蒙版
+        _, mask = cv2.threshold(frame, threshold, 255, cv2.THRESH_BINARY)
+
+        # 应用蒙版到原图，这里使用cv2.bitwise_and函数
+        masked_frame = cv2.bitwise_and(frame, frame, mask=mask)
+
+        # 找到蒙版中所有非零像素的坐标
+        mask_coords = np.column_stack(np.where(mask > 0))
+
+        # !need to be improved!!!!!!!!!!!! geometric center may not be the light's position if the light source are influenced by another light source
+        if mask_coords.size > 0:
+            center_x = int(np.mean(mask_coords[:, 1]))
+            center_y = int(np.mean(mask_coords[:, 0]))
+            print("蒙版的中心坐标为:", (center_x, center_y))
+        else:
+            print("蒙版中没有非零像素，无法确定中心。")
+
+        pixel_sum = cv2.sumElems(masked_frame)[0]
+
+        return pixel_sum, [center_x, center_y]
+    
+    def record(self, frame):
+        pixel_sum, pixel_loc = self.mask(frame)
+
+        t = rospy.Time.now()
+
+        # the structure of the data is : a list stores the data in following way: [time, camera position from vicon, camera position from vicon, camera exposure time, the sum of pixel value, the location of the light source in the frame]
+        self.data.append([t, None, None, self.exposure, pixel_sum, pixel_loc])
+
+    def record_true(self, frame):
+        pixel_sum, pixel_loc = self.mask(frame)
+
+        t = rospy.Time.now()
+
+        # the structure of the data is : a list stores the data in following way: [time, camera position from vicon, camera rotation from vicon, camera exposure time, the sum of pixel value, the location of the light source in the frame]
+        self.true_data[t] = {
+                'time': t,
+                'cam_pose': None,
+                'cam_R': None,
+                'cam_exp': self.exposure,
+                'val': pixel_sum,
+                'loc': pixel_loc
+            }
+        
         
     def release(self):
         # 关闭相机
@@ -165,6 +224,7 @@ if __name__ == '__main__':
     cam = Camera()
     # 修改为Linux风格的路径
     image_dir = r"/home/chenhaoyu/IROS_workspace/images/exp50_Ap4_5_1_5m/"
+    pose_dir = r"/home/chenhaoyu/IROS_workspace/images/exp50_Ap4_5_1_5m/data.m"
     if not os.path.exists(image_dir):
         # 在Linux中创建目录
         os.makedirs(image_dir)
@@ -181,17 +241,12 @@ if __name__ == '__main__':
                 if e.error_code != mvsdk.CAMERA_STATUS_TIME_OUT:
                     print("CameraGetImageBuffer failed({}): {}".format(e.error_code, e.message) )
 
+            cam.record_true(frame)
+
             if np.max(frame) >= 200 or np.max(frame) <= 100:
-                # cam.exposure_adjustment(low = max(1, cam.exposure//10), high = min(10000, cam.exposure*10))
                 cam.exposure_adjustment()
 
-
-            print(cam.exposure)
-
-            # cv2.imshow('mono',frame)
-            cam.publish_frame(frame)  # Publish the image as a ROS topic
-
-              
+            # cam.publish_frame(frame)  # Publish the image as a ROS topic
 
             if cv2.waitKey(1) & 0xFF in [ord('q'), 27]:
                 break
@@ -203,3 +258,5 @@ if __name__ == '__main__':
     finally:
         cam.release()
         cv2.destroyAllWindows()
+        savemat(pose_dir, cam.true_data)
+        print('save file successfully')
