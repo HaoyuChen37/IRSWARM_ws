@@ -9,6 +9,7 @@ import numpy as np
 import cv2
 import mvsdk
 import platform
+from scipy.io import savemat
 
 class Camera(object):
     def __init__(self, width=1280, height=720, fps=30):
@@ -29,6 +30,7 @@ class Camera(object):
         self.b
         # store data
         self.data = []
+        self.true_data = {}
         
     def initialization(self):
     # 枚举相机
@@ -157,7 +159,7 @@ class Camera(object):
         # 微调曝光时间
         self.exposure = best_exposure_time
 
-    def record(self, frame):
+    def mask(frame):
         # 计算图像的平均像素值
         mean_val = cv2.mean(frame)[0]
 
@@ -183,10 +185,30 @@ class Camera(object):
 
         pixel_sum = cv2.sumElems(masked_frame)[0]
 
+        return pixel_sum, [center_x, center_y]
+    
+    def record(self, frame):
+        pixel_sum, pixel_loc = self.mask(frame)
+
         t = rospy.Time.now()
 
         # the structure of the data is : a list stores the data in following way: [time, camera position from vicon, camera position from vicon, camera exposure time, the sum of pixel value, the location of the light source in the frame]
-        self.data.append([t, None, None, self.exposure, pixel_sum, [center_x, center_y]])
+        self.data.append([t, None, None, self.exposure, pixel_sum, pixel_loc])
+
+    def record_true(self, frame):
+        pixel_sum, pixel_loc = self.mask(frame)
+
+        t = rospy.Time.now()
+
+        # the structure of the data is : a list stores the data in following way: [time, camera position from vicon, camera rotation from vicon, camera exposure time, the sum of pixel value, the location of the light source in the frame]
+        self.true_data[t] = {
+                'time': t,
+                'cam_pose': None,
+                'cam_R': None,
+                'cam_exp': self.exposure,
+                'val': pixel_sum,
+                'loc': pixel_loc
+            }
         
         
     def release(self):
@@ -202,6 +224,7 @@ if __name__ == '__main__':
     cam = Camera()
     # 修改为Linux风格的路径
     image_dir = r"/home/chenhaoyu/IROS_workspace/images/exp50_Ap4_5_1_5m/"
+    pose_dir = r"/home/chenhaoyu/IROS_workspace/images/exp50_Ap4_5_1_5m/data.m"
     if not os.path.exists(image_dir):
         # 在Linux中创建目录
         os.makedirs(image_dir)
@@ -218,10 +241,12 @@ if __name__ == '__main__':
                 if e.error_code != mvsdk.CAMERA_STATUS_TIME_OUT:
                     print("CameraGetImageBuffer failed({}): {}".format(e.error_code, e.message) )
 
+            cam.record_true(frame)
+
             if np.max(frame) >= 200 or np.max(frame) <= 100:
                 cam.exposure_adjustment()
 
-            cam.publish_frame(frame)  # Publish the image as a ROS topic
+            # cam.publish_frame(frame)  # Publish the image as a ROS topic
 
             if cv2.waitKey(1) & 0xFF in [ord('q'), 27]:
                 break
@@ -233,3 +258,5 @@ if __name__ == '__main__':
     finally:
         cam.release()
         cv2.destroyAllWindows()
+        savemat(pose_dir, cam.true_data)
+        print('save file successfully')
