@@ -55,11 +55,12 @@ class Camera(object):
         self.car_R = np.zeros([3,3])
         self.car_pose = np.array([0, 0, 0])
         self.exposure = 312
-        self.k
-        self.b
+        self.k = 0
+        self.b = 0
+        self.pixel_sum = 0
+        self.pixel_loc = [0, 0]
         # store data
-        self.data = []
-        self.true_data = {}
+        self.true_data = {'time':[], 'cam_pose':[], 'cam_R':[], 'car_pose':[], 'car_R':[], 'true_dis':[], 'calculated_dis':[], 'cam_exp':[], 'val':[], 'loc':[]}
         
     def initialization(self):
     # 枚举相机
@@ -210,7 +211,7 @@ class Camera(object):
         # 微调曝光时间
         self.exposure = best_exposure_time
 
-    def mask(frame):
+    def mask(self, frame):
         # 计算图像的平均像素值
         mean_val = cv2.mean(frame)[0]
 
@@ -231,32 +232,30 @@ class Camera(object):
             center_x = int(np.mean(mask_coords[:, 1]))
             center_y = int(np.mean(mask_coords[:, 0]))
             print("蒙版的中心坐标为:", (center_x, center_y))
+            self.pixel_sum = cv2.sumElems(masked_frame)[0]
+            self.pixel_loc = [center_x, center_y]
         else:
             print("蒙版中没有非零像素，无法确定中心。")
 
-        pixel_sum = cv2.sumElems(masked_frame)[0]
-
-        return pixel_sum, [center_x, center_y]
+        
 
     def record_true(self, frame):
-        pixel_sum, pixel_loc = self.mask(frame)
-        calculated_dis = self.calculate_distance(pixel_sum)
-
-        t = rospy.Time.now()
+        self.mask(frame)
+        # calculated_dis = self.calculate_distance(self.pixel_sum)
+        print(rospy.Time.now().to_nsec())
+        t = int(str(rospy.Time.now().to_nsec()))
 
         # the structure of the data is : a list stores the data in following way: [time, camera position from vicon, camera rotation from vicon, car position from vicon, car rotation from vicon, camera exposure time, the sum of pixel value, the location of the light source in the frame]
-        self.true_data[t] = {
-                'time': t,
-                'cam_pose': self.cam_pose,
-                'cam_R': self.cam_R,
-                'car_pose': self.cam_pose,
-                'car_R': self.cam_R,
-                'true_dis' : record_distance(self.cam_pose, self.car_pose),
-                # 'calculated_dis' : calculated_dis,
-                'cam_exp': self.exposure,
-                'val': pixel_sum,
-                'loc': pixel_loc
-            }
+        self.true_data['time'].append(t)
+        self.true_data['cam_pose'].append(self.cam_pose)
+        self.true_data['cam_R'].append(self.cam_R)
+        self.true_data['car_pose'].append(self.cam_pose)
+        self.true_data['car_R'].append(self.cam_R)
+        self.true_data['true_dis'] .append(record_distance(self.cam_pose, self.car_pose))
+        # self.true_data[calculated_dis'].append(calculated_dis)
+        self.true_data['cam_exp'].append(self.exposure)
+        self.true_data['val'].append(self.pixel_sum)
+        self.true_data['loc'].append(self.pixel_loc)
         
         
     def release(self):
@@ -270,9 +269,9 @@ class Camera(object):
 
 if __name__ == '__main__':
     cam = Camera()
-    folder_name = input('input the folder name')
+    folder_name = input('input the folder name:')
     image_dir = f"/home/chenhaoyu/IROS_workspace/images/{folder_name}/"
-    pose_dir = f"/home/chenhaoyu/IROS_workspace/images/{folder_name}/data.m"
+    pose_dir = f"/home/chenhaoyu/IROS_workspace/images/{folder_name}/data.mat"
     if not os.path.exists(image_dir):
         # 在Linux中创建目录
         os.makedirs(image_dir)
@@ -306,5 +305,7 @@ if __name__ == '__main__':
     finally:
         cam.release()
         cv2.destroyAllWindows()
+        for key, value in cam.true_data.items():
+            cam.true_data[key] = np.array(value)
         savemat(pose_dir, cam.true_data)
         print('save file successfully')
