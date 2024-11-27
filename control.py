@@ -10,6 +10,28 @@ import cv2
 import mvsdk
 import platform
 from scipy.io import savemat
+import tf
+
+def get_homogenious(quaternion, position): 
+        # 将四元数转换为欧拉角，返回matrix
+        R = tf.transformations.quaternion_matrix([quaternion.x, quaternion.y, quaternion.z, quaternion.w])
+        t = np.array([position.x, position.y, position.z])
+        T = np.zeros([4, 4])
+        T[0:3, 0:3] = R[0:3, 0:3]
+        T[0,3] = t[0]
+        T[1,3] = t[1]
+        T[2,3] = t[2]
+        T[3, 3] = 1
+        return T
+
+def get_matrix_from_quaternion(quaternion):
+    matrix = tf.transformations.quaternion_matrix([quaternion.x, quaternion.y, quaternion.z, quaternion.w])
+    matrix = matrix[:3,:3]
+    return matrix
+
+def record_distance(pose1, pose2):
+    dis = ((pose1[0]-pose2[0])**2 + (pose1[1]-pose2[1])**2 + (pose1[2]-pose2[2])**2) **0.5
+    return dis
 
 class Camera(object):
     def __init__(self, width=1280, height=720, fps=30):
@@ -17,7 +39,9 @@ class Camera(object):
         self.width = width
         self.height = height
         self.bridge = CvBridge()
-        self.image_pub = rospy.Publisher("/camera/color/image_raw", Image, queue_size=10)
+        self.image_pub = rospy.Publisher("/camera/color/image_raw", Image, queue_size=30)
+        self.cam_sub = rospy.Subscriber("/vrpn_client_node/mindvision/pose", PoseStamped, self.cam_callback)
+        self.car_sub = rospy.Subscriber("/vrpn_client_node/car_light/pose", PoseStamped, self.car_callback)
         # initialize camera parameters
         self.DevList = []
         self.hCamera = 0
@@ -26,6 +50,11 @@ class Camera(object):
         self.shutter = [10000, 5000, 2500, 1250, 625, 312, 156, 78, 39, 19, 9, 5, 2, 1]
         self.fps = fps
         # paramatars from calibration
+        self.cam_R = np.zeros([3,3])
+        self.cam_pose = np.array([0, 0, 0])
+        self.car_R = np.zeros([3,3])
+        self.car_pose = np.array([0, 0, 0])
+        self.exposure = 312
         self.k
         self.b
         # store data
@@ -111,6 +140,28 @@ class Camera(object):
         ros_image.header.stamp = rospy.Time.now()
         self.image_pub.publish(ros_image)
 
+    def cam_callback(self, msg):
+        # vicon消息
+        global M_tool2vicon
+        self.cam_R = get_matrix_from_quaternion(msg.pose.orientation)
+        self.cam_pose = [msg.pose.position.x, msg.pose.position.y, msg.pose.position.z]
+        M_tool2vicon = get_homogenious(msg.pose.orientation, msg.pose.position)
+        # 例如，打印vicon的位置信息
+        # print("Received vicon position:", msg.pose.position.x, msg.pose.position.y, msg.pose.position.z)
+
+    def car_callback(self, msg):
+        # vicon消息
+        global M_car2vicon
+        self.car_R = get_matrix_from_quaternion(msg.pose.orientation)
+        self.car_pose = [msg.pose.position.x, msg.pose.position.y, msg.pose.position.z]
+        M_car2vicon = get_homogenious(msg.pose.orientation, msg.pose.position)
+        # 例如，打印vicon的位置信息
+        # print("Received vicon position:", msg.pose.position.x, msg.pose.position.y, msg.pose.position.z)
+
+    def calculate_distance(self, pixel_sum):
+        dis = ((pixel_sum/self.exposure - self.b)/self.k)**0.5
+        return dis
+
     def exposure_adjustment(self, low = 1, high = 100000):
         target_pixel_value = 150
 
@@ -186,25 +237,22 @@ class Camera(object):
         pixel_sum = cv2.sumElems(masked_frame)[0]
 
         return pixel_sum, [center_x, center_y]
-    
-    def record(self, frame):
-        pixel_sum, pixel_loc = self.mask(frame)
-
-        t = rospy.Time.now()
-
-        # the structure of the data is : a list stores the data in following way: [time, camera position from vicon, camera position from vicon, camera exposure time, the sum of pixel value, the location of the light source in the frame]
-        self.data.append([t, None, None, self.exposure, pixel_sum, pixel_loc])
 
     def record_true(self, frame):
         pixel_sum, pixel_loc = self.mask(frame)
+        calculated_dis = self.calculate_distance(pixel_sum)
 
         t = rospy.Time.now()
 
-        # the structure of the data is : a list stores the data in following way: [time, camera position from vicon, camera rotation from vicon, camera exposure time, the sum of pixel value, the location of the light source in the frame]
+        # the structure of the data is : a list stores the data in following way: [time, camera position from vicon, camera rotation from vicon, car position from vicon, car rotation from vicon, camera exposure time, the sum of pixel value, the location of the light source in the frame]
         self.true_data[t] = {
                 'time': t,
-                'cam_pose': None,
-                'cam_R': None,
+                'cam_pose': self.cam_pose,
+                'cam_R': self.cam_R,
+                'car_pose': self.cam_pose,
+                'car_R': self.cam_R,
+                'true_dis' : record_distance(self.cam_pose, self.car_pose),
+                # 'calculated_dis' : calculated_dis,
                 'cam_exp': self.exposure,
                 'val': pixel_sum,
                 'loc': pixel_loc
@@ -222,9 +270,9 @@ class Camera(object):
 
 if __name__ == '__main__':
     cam = Camera()
-    # 修改为Linux风格的路径
-    image_dir = r"/home/chenhaoyu/IROS_workspace/images/exp50_Ap4_5_1_5m/"
-    pose_dir = r"/home/chenhaoyu/IROS_workspace/images/exp50_Ap4_5_1_5m/data.m"
+    folder_name = input('input the folder name')
+    image_dir = f"/home/chenhaoyu/IROS_workspace/images/{folder_name}/"
+    pose_dir = f"/home/chenhaoyu/IROS_workspace/images/{folder_name}/data.m"
     if not os.path.exists(image_dir):
         # 在Linux中创建目录
         os.makedirs(image_dir)
