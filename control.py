@@ -59,8 +59,10 @@ class Camera(object):
         self.b = 0
         self.pixel_sum = 0
         self.pixel_loc = [0, 0]
+	self.frame_ave_value = 0
+	self.frame_max_value = 0
         # store data
-        self.true_data = {'time':[], 'cam_pose':[], 'cam_R':[], 'car_pose':[], 'car_R':[], 'true_dis':[], 'calculated_dis':[], 'cam_exp':[], 'val':[], 'loc':[]}
+        self.true_data = {'time':[], 'cam_pose':[], 'cam_R':[], 'car_pose':[], 'car_R':[], 'true_dis':[], 'calculated_dis':[], 'cam_exp':[], 'val':[], 'loc':[], 'frame_ave_value':[]}
         
     def initialization(self):
     # 枚举相机
@@ -212,11 +214,13 @@ class Camera(object):
         self.exposure = best_exposure_time
 
     def mask(self, frame):
+	# 获得图像的最大像素值
+	self.frame_ave_value = cv2.max(frame)
         # 计算图像的平均像素值
-        mean_val = cv2.mean(frame)[0]
+	self.frame_ave_value = cv2.mean(frame)[0]
 
         # 设置阈值为图像平均像素值的2倍
-        threshold = 2 * mean_val
+        threshold = 2 * self.frame_ave_value
 
         # 应用阈值来创建蒙版
         _, mask = cv2.threshold(frame, threshold, 255, cv2.THRESH_BINARY)
@@ -252,10 +256,13 @@ class Camera(object):
         self.true_data['car_pose'].append(self.cam_pose)
         self.true_data['car_R'].append(self.cam_R)
         self.true_data['true_dis'] .append(record_distance(self.cam_pose, self.car_pose))
-        # self.true_data[calculated_dis'].append(calculated_dis)
+        # self.true_data['calculated_dis'].append(calculated_dis)
         self.true_data['cam_exp'].append(self.exposure)
         self.true_data['val'].append(self.pixel_sum)
         self.true_data['loc'].append(self.pixel_loc)
+	self.true_data['frame_ave_value'].append(self.frame_ave_value)
+	self.true_data['frame_max_value'].append(self.frame_max_value)
+	    
         
         
     def release(self):
