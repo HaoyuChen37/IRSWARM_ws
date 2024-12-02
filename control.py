@@ -277,8 +277,8 @@ class Camera(object):
 if __name__ == '__main__':
     cam = Camera()
     folder_name = input('input the folder name:')
-    image_dir = f"/home/chenhaoyu/IROS_workspace/images/{folder_name}/"
-    pose_dir = f"/home/chenhaoyu/IROS_workspace/images/{folder_name}/data.mat"
+    image_dir = f"~/LightSwarm_ws/images/{folder_name}/"
+    pose_dir = f"~/LightSwarm_ws/images/{folder_name}/data.mat"
     if not os.path.exists(image_dir):
         # 在Linux中创建目录
         os.makedirs(image_dir)
