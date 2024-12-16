@@ -29,6 +29,11 @@ def get_matrix_from_quaternion(quaternion):
     matrix = matrix[:3,:3]
     return matrix
 
+def get_euler_from_quaternion(quaternion):
+    roll, pitch, yaw = tf.transformations.euler_from_quaternion([quaternion.x, quaternion.y, quaternion.z, quaternion.w])
+    euler = [roll, pitch, yaw]
+    return euler
+
 def record_distance(pose1, pose2):
     dis = ((pose1[0]-pose2[0])**2 + (pose1[1]-pose2[1])**2 + (pose1[2]-pose2[2])**2) **0.5
     return dis
@@ -51,18 +56,20 @@ class Camera(object):
         self.fps = fps
         # paramatars from calibration
         self.cam_R = np.zeros([3,3])
+        self.cam_euler = np.array([0, 0, 0])
         self.cam_pose = np.array([0, 0, 0])
         self.car_R = np.zeros([3,3])
+        self.car_euler = np.array([0, 0, 0])
         self.car_pose = np.array([0, 0, 0])
         self.exposure = 312
         self.k = 0
         self.b = 0
         self.pixel_sum = 0
         self.pixel_loc = [0, 0]
-	self.frame_ave_value = 0
-	self.frame_max_value = 0
+        self.frame_ave_value = 0
+        self.frame_max_value = 0
         # store data
-        self.true_data = {'time':[], 'cam_pose':[], 'cam_R':[], 'car_pose':[], 'car_R':[], 'true_dis':[], 'calculated_dis':[], 'cam_exp':[], 'val':[], 'loc':[], 'frame_ave_value':[]}
+        self.true_data = {'time':[], 'cam_pose':[], 'cam_R':[], 'cam_euler':[], 'car_pose':[], 'car_R':[], 'cam_euler':[], 'true_dis':[], 'calculated_dis':[], 'cam_exp':[], 'val':[], 'loc':[], 'frame_ave_value':[]}
         
     def initialization(self):
     # 枚举相机
@@ -147,6 +154,7 @@ class Camera(object):
         # vicon消息
         global M_tool2vicon
         self.cam_R = get_matrix_from_quaternion(msg.pose.orientation)
+        self.cam_euler = get_euler_from_quaternion(msg.pose.orientation)
         self.cam_pose = [msg.pose.position.x, msg.pose.position.y, msg.pose.position.z]
         M_tool2vicon = get_homogenious(msg.pose.orientation, msg.pose.position)
         # 例如，打印vicon的位置信息
@@ -156,6 +164,7 @@ class Camera(object):
         # vicon消息
         global M_car2vicon
         self.car_R = get_matrix_from_quaternion(msg.pose.orientation)
+        self.car_euler = get_euler_from_quaternion(msg.pose.orientation)
         self.car_pose = [msg.pose.position.x, msg.pose.position.y, msg.pose.position.z]
         M_car2vicon = get_homogenious(msg.pose.orientation, msg.pose.position)
         # 例如，打印vicon的位置信息
@@ -214,10 +223,10 @@ class Camera(object):
         self.exposure = best_exposure_time
 
     def mask(self, frame):
-	# 获得图像的最大像素值
-	self.frame_ave_value = cv2.max(frame)
-        # 计算图像的平均像素值
-	self.frame_ave_value = cv2.mean(frame)[0]
+        # 获得图像的最大像素值
+        self.frame_ave_value = cv2.max(frame)
+            # 计算图像的平均像素值
+        self.frame_ave_value = cv2.mean(frame)[0]
 
         # 设置阈值为图像平均像素值的2倍
         threshold = 2 * self.frame_ave_value
@@ -253,15 +262,17 @@ class Camera(object):
         self.true_data['time'].append(t)
         self.true_data['cam_pose'].append(self.cam_pose)
         self.true_data['cam_R'].append(self.cam_R)
+        self.true_data['cam_euler'].append(self.cam_euler)
         self.true_data['car_pose'].append(self.cam_pose)
         self.true_data['car_R'].append(self.cam_R)
+        self.true_data['car_euler'].append(self.car_euler)
         self.true_data['true_dis'] .append(record_distance(self.cam_pose, self.car_pose))
         # self.true_data['calculated_dis'].append(calculated_dis)
         self.true_data['cam_exp'].append(self.exposure)
         self.true_data['val'].append(self.pixel_sum)
         self.true_data['loc'].append(self.pixel_loc)
-	self.true_data['frame_ave_value'].append(self.frame_ave_value)
-	self.true_data['frame_max_value'].append(self.frame_max_value)
+        self.true_data['frame_ave_value'].append(self.frame_ave_value)
+        self.true_data['frame_max_value'].append(self.frame_max_value)
 	    
         
         
