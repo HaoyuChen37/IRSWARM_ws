@@ -46,4 +46,4 @@ sudo pip install autopep8
 autopep8 -i /home/nvidia/LightSwarm_ws/src/mv/scripts/control.py
 ```
 
-
+nvidia-docker run -it --rm     --name llm-code     -v /home/nvidia/docker/code_llm_ws:/catkin_ws     --workdir /catkin_ws     --network host     llm_simulator
