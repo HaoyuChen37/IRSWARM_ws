@@ -5,9 +5,9 @@ from datetime import datetime
 import rospy
 from sensor_msgs.msg import Image
 from geometry_msgs.msg import PoseStamped
+import cv2
 from cv_bridge import CvBridge
 import numpy as np
-import cv2
 import mvsdk
 import platform
 from scipy.io import savemat
