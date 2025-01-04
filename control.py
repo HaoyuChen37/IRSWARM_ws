@@ -1,4 +1,5 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 import os
 from datetime import datetime
 import rospy
@@ -11,6 +12,7 @@ import mvsdk
 import platform
 from scipy.io import savemat
 import tf
+from datetime import datetime
 
 def get_homogenious(quaternion, position): 
         # 将四元数转换为欧拉角，返回matrix
@@ -69,7 +71,7 @@ class Camera(object):
         self.frame_ave_value = 0
         self.frame_max_value = 0
         # store data
-        self.true_data = {'time':[], 'cam_pose':[], 'cam_R':[], 'cam_euler':[], 'car_pose':[], 'car_R':[], 'cam_euler':[], 'true_dis':[], 'calculated_dis':[], 'cam_exp':[], 'val':[], 'loc':[], 'frame_ave_value':[]}
+        self.true_data = {'time':[], 'cam_pose':[], 'cam_R':[], 'cam_euler':[], 'car_pose':[], 'car_R':[], 'car_euler':[], 'true_dis':[], 'calculated_dis':[], 'cam_exp':[], 'val':[], 'loc':[], 'frame_ave_value':[]}
         
     def initialization(self):
     # 枚举相机
@@ -224,7 +226,6 @@ class Camera(object):
 
     def mask(self, frame):
         # 获得图像的最大像素值
-        self.frame_ave_value = cv2.max(frame)
             # 计算图像的平均像素值
         self.frame_ave_value = cv2.mean(frame)[0]
 
@@ -272,7 +273,7 @@ class Camera(object):
         self.true_data['val'].append(self.pixel_sum)
         self.true_data['loc'].append(self.pixel_loc)
         self.true_data['frame_ave_value'].append(self.frame_ave_value)
-        self.true_data['frame_max_value'].append(self.frame_max_value)
+        # self.true_data['frame_max_value'].append(self.frame_max_value)
 	    
         
         
@@ -297,9 +298,12 @@ if __name__ == '__main__':
     try:
         r = rospy.Rate(30)  # 30hz
         cam.initialization()
+       
         while not rospy.is_shutdown():
             try:
+                current_time = datetime.now().strftime('%m%d%H%M%S%f')
                 frame = cam.get_frame()
+                cv2.imwrite(image_dir+current_time+".png",frame)
                 if frame is None:
                     continue
             except mvsdk.CameraException as e:
@@ -308,8 +312,8 @@ if __name__ == '__main__':
 
             cam.record_true(frame)
 
-            if np.max(frame) >= 200 or np.max(frame) <= 100:
-                cam.exposure_adjustment()
+            # if np.max(frame) >= 200 or np.max(frame) <= 100:
+            #     cam.exposure_adjustment()
 
             # cam.publish_frame(frame)  # Publish the image as a ROS topic
 
