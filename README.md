@@ -20,6 +20,7 @@ mkdir scripts
 ```
 复制文件到script文件夹下面，添加可操作权限
 ```bash
+cd scripts
 chmod +x mv_con.py
 ```
 调整缩进
