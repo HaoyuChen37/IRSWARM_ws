@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Copyright (c) 2024 WindyLab of Westlake University, China
 All rights reserved.
@@ -20,8 +21,8 @@ import rospy
 import os
 from paho.mqtt import client as mqtt_client
 
-global entity_id
-entity_id = 0 # car's ID
+
+entity_id = 3 # car's ID
 
 def rich_print(title, content):
     print(f"{title}: {content}")
@@ -34,7 +35,7 @@ def rich_print(title, content):
 
 class Controller():
     def __init__(self):
-        self.joy_input = None
+        self.joy_input = {'x':0,'y':0,'theta':0}
         try:
             rospy.init_node("omni_engine", anonymous=True)
         except rospy.exceptions.ROSException:
@@ -111,21 +112,15 @@ class Controller():
         self.last_buttons = current_buttons
         self.last_axes = current_axes
 
-    def control_velocity(self, desired_velocity, entity_id, dt=None):
-
-        json_msg = {
-            "x": desired_velocity["x"],
-            "y": desired_velocity["y"],
-            "theta": desired_velocity["theta"],
-        }
+    def control_velocity(self, desired_velocity, entity_id = 3, dt=None):
+        json_msg = desired_velocity
         json_str = json.dumps(json_msg)
         self.mqtt_client.publish(
             f"/VSWARM{entity_id}_robot/motion", json_str.encode("utf-8")
         )
 
     def apply_joy_control(self):
-
-        self.control_velocity(entity_id, self.joy_input)
+        self.control_velocity(self.joy_input)
 
 
 class MqttClientThread:
@@ -182,3 +177,7 @@ class MqttClientThread:
                 # 再次等待一段时间后继续循环尝试
                 time.sleep(self.reconnect_interval)
             # 继续循环，如果仍无法连接，继续捕获异常并处理
+
+if __name__ == '__main__':
+    controller = Controller()
+    rospy.spin()
