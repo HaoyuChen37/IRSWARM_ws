@@ -48,3 +48,10 @@ autopep8 -i /home/nvidia/LightSwarm_ws/src/mv/scripts/control.py
 ```
 
 nvidia-docker run -it --rm     --name llm-code     -v /home/nvidia/docker/code_llm_ws:/catkin_ws     --workdir /catkin_ws     --network host     llm_simulator
+
+
+手柄控制需要的一些依赖
+```bash
+sudo apt-get install ros-noetic-joy
+pip install paho-mqtt
+```
