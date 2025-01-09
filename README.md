@@ -49,9 +49,77 @@ autopep8 -i /home/nvidia/LightSwarm_ws/src/mv/scripts/control.py
 
 nvidia-docker run -it --rm     --name llm-code     -v /home/nvidia/docker/code_llm_ws:/catkin_ws     --workdir /catkin_ws     --network host     llm_simulator
 
-
+## 手柄控制
 手柄控制需要的一些依赖
 ```bash
 sudo apt-get install ros-noetic-joy
 pip install paho-mqtt
+```
+
+## 新建消息类型
+package.xml中添加编译依赖与执行依赖
+```xml
+  <build_depend>message_generation</build_depend>
+  <exec_depend>message_runtime</exec_depend>
+```
+
+CMakeLists.txt编辑 msg 相关配置
+```txt
+find_package(catkin REQUIRED COMPONENTS
+  roscpp
+  rospy
+  std_msgs
+  message_generation
+)
+# 需要加入 message_generation,必须有 std_msgs
+```
+
+配置 msg 源文件
+```txt
+add_message_files(
+  FILES
+  LightInfo.msg
+  LightsInfo.msg
+)
+```
+```txt
+生成消息时依赖于 std_msgs
+generate_messages(
+  DEPENDENCIES
+  std_msgs
+)
+```
+
+```txt
+#执行时依赖
+catkin_package(
+#  INCLUDE_DIRS include
+#  LIBRARIES demo02_talker_listener
+  CATKIN_DEPENDS roscpp rospy std_msgs message_runtime
+#  DEPENDS system_lib
+)
+```
+在Cmake文件中改：
+```txt
+find_package(catkin REQUIRED COMPONENTS
+  roscpp
+  rospy
+  std_msgs
+  message_generation
+)
+add_message_files(
+  FILES
+  LightInfo.msg
+  LightsInfo.msg
+)
+generate_messages(
+  DEPENDENCIES
+  std_msgs
+)
+catkin_package(
+#  INCLUDE_DIRS include
+#  LIBRARIES demo02_talker_listener
+  CATKIN_DEPENDS roscpp rospy std_msgs message_runtime
+#  DEPENDS system_lib
+)
 ```
