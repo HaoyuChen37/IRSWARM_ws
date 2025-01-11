@@ -1,0 +1,12 @@
+<!-- launchfile.launch -->
+<launch>
+  <!-- 启动相机节点 -->
+  <node name="cam1" pkg="mv" type="cam1.py" output="screen"/>
+  <node name="cam2" pkg="mv" type="cam2.py" output="screen"/>
+  <node name="cam3" pkg="mv" type="cam3.py" output="screen"/>
+  <node name="cam4" pkg="mv" type="cam4.py" output="screen"/>
+
+  <!-- 启动控制小车的节点 -->
+  <node name="auto_control" pkg="mv" type="auto_control.py" output="screen"/>
+
+</launch>
