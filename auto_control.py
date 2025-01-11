@@ -9,6 +9,7 @@ lights_data = {}
 vel = (0, 0)
 
 def callback(data):
+    rospy.loginfo("Received LightsInfo:")
     global lights_data
     global vel
     vel = (0, 0)
@@ -33,7 +34,6 @@ def callback(data):
     lights_data['lights'] = lights_list
     
     # 打印字典内容（可选）
-    rospy.loginfo("Received LightsInfo:")
     rospy.loginfo(lights_data)
     
     # 发布速度指令
