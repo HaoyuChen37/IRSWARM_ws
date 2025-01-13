@@ -55,7 +55,27 @@ nvidia-docker run -it --rm     --name llm-code     -v /home/nvidia/docker/code_l
 sudo apt-get install ros-noetic-joy
 pip install paho-mqtt
 ```
-
+运行ROSCORE
+```bash
+roscore
+```
+运行joy包下面的joy_node节点
+```bash
+rosrun joy joy_node
+```
+运行mv包下的stick_control.py
+```bash
+cd IROS_workspace
+catkin_make
+source devel/setup.bash
+rosrun mv stick_control.py
+```
+## 订阅真实坐标
+启动VICON节点
+```bash
+roslaunch vrpn_client_ros sample.launch server:=192.168.50.3
+```
+订阅VICON消息
 ## 新建消息类型
 package.xml中添加编译依赖与执行依赖
 ```xml
