@@ -21,7 +21,7 @@ mkdir scripts
 复制文件到script文件夹下面，添加可操作权限
 ```bash
 cd scripts
-chmod +x mv_con.py
+chmod +x cam1.py cam2.py cam3.py cam4.py auto_control.py
 ```
 调整缩进
 ```bash
