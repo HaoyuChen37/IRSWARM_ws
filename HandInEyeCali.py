@@ -26,10 +26,10 @@ def get_homogenious(quaternion, position):
         return T
 
 
-cameraMatrix = np.array([[433.84310735  , 0.           , 316.35195148],
-                [  0.          , 407.29303267 , 227.97832544],
-                [  0.          , 0.           ,    1.       ]])
-distCoeffs = np.array([[-0.10002762 , 0.10331554 , -0.00067012 , -0.0003735 , -0.01315765]])
+cameraMatrix = np.array([[436.04379372 ,  0.    ,     322.2056478 ],
+ [  0.    ,     408.81252158 , 231.98256365],
+ [  0.    ,       0.         ,  1.        ]])
+distCoeffs = np.array( [[-0.09917725 , 0.1034774  , 0.00054878,  0.0001342 , -0.01694831]])
 
 points_dict = {
     0: [
@@ -139,7 +139,7 @@ class Camera(object):
     def __init__(self, width=1280, height=720, fps=30):
         rospy.init_node('mindvision_camera_node', anonymous=True)
         # 订阅vicon信息
-        self.cam_sub = rospy.Subscriber("/vrpn_client_node/mindvision/pose", PoseStamped, self.cam_callback)
+        self.cam_sub = rospy.Subscriber("/vrpn_client_node/IRSWARM1/pose", PoseStamped, self.cam_callback)
         self.cali_sub = rospy.Subscriber("/vrpn_client_node/Cali_ruler/pose", PoseStamped, self.cali_callback)
         self.width = width
         self.height = height
@@ -257,7 +257,7 @@ class Camera(object):
 if __name__ == '__main__':
     cam = Camera()
     # 修改为Linux风格的路径
-    marker_dir = r"/home/chenhaoyu/mindvision/EyeInHand/marker"
+    marker_dir = r"/home/chenhaoyu/IROS_cali/EyeInHand/marker"
     if not os.path.exists(marker_dir):
         # 在Linux中创建目录
         os.makedirs(marker_dir)
@@ -273,7 +273,7 @@ if __name__ == '__main__':
             except mvsdk.CameraException as e:
                 if e.error_code != mvsdk.CAMERA_STATUS_TIME_OUT:
                     print("CameraGetImageBuffer failed({}): {}".format(e.error_code, e.message) )
-            #frame = 255 -frame
+            frame = 255 -frame
             arucoDict = cv2.aruco.Dictionary_get(cv2.aruco.DICT_6X6_250)
             arucoParams = cv2.aruco.DetectorParameters_create()
             (corners, ids, rejected) = cv2.aruco.detectMarkers(frame, arucoDict, parameters=arucoParams)
