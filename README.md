@@ -4,13 +4,21 @@
 wget http://fishros.com/install -O fishros && . fishros
 ```
 ## 部署小车控制
+下载serial
+```bash
+sudo apt-get install ros-noetic-serial
+```
 U盘上拷ComputingBoard
 进入real_ws，在终端运行
 ```bash
 ./build.sh
 ```
 ## install camera SDK
-
+新建MVSDK文件夹
+U盘上拷1_Linux...tar.xx
+```bash
+tar -zxvf [tab]
+```
 ## Create ROS workspace
 创建工作空间并初始化
 ```bash
