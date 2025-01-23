@@ -1,4 +1,14 @@
 # multi-light-detecting system
+## 下载ros
+```bash
+wget http://fishros.com/install -O fishros && . fishros
+```
+## 部署小车控制
+U盘上拷ComputingBoard
+进入real_ws，在终端运行
+```bash
+./build.sh
+```
 ## install camera SDK
 
 ## Create ROS workspace
