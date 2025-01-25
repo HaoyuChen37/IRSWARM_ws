@@ -4,7 +4,7 @@ import os
 from datetime import datetime
 import rospy
 from sensor_msgs.msg import Image
-from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import TransformStamped
 import cv2
 from cv_bridge import CvBridge
 import numpy as np
@@ -13,38 +13,8 @@ import platform
 from scipy.io import savemat
 import tf
 from datetime import datetime
-from mv.msg import _LightInfo, _LightsInfo
-
-
-def get_homogenious(quaternion, position):
-    # 将四元数转换为欧拉角，返回matrix
-    R = tf.transformations.quaternion_matrix([quaternion.x, quaternion.y, quaternion.z, quaternion.w])
-    t = np.array([position.x, position.y, position.z])
-    T = np.zeros([4, 4])
-    T[0:3, 0:3] = R[0:3, 0:3]
-    T[0, 3] = t[0]
-    T[1, 3] = t[1]
-    T[2, 3] = t[2]
-    T[3, 3] = 1
-    return T
-
-
-def get_matrix_from_quaternion(quaternion):
-    matrix = tf.transformations.quaternion_matrix([quaternion.x, quaternion.y, quaternion.z, quaternion.w])
-    matrix = matrix[:3, :3]
-    return matrix
-
-
-def get_euler_from_quaternion(quaternion):
-    roll, pitch, yaw = tf.transformations.euler_from_quaternion(
-        [quaternion.x, quaternion.y, quaternion.z, quaternion.w])
-    euler = [roll, pitch, yaw]
-    return euler
-
-
-def record_distance(pose1, pose2):
-    dis = ((pose1[0] - pose2[0]) ** 2 + (pose1[1] - pose2[1]) ** 2 + (pose1[2] - pose2[2]) ** 2) ** 0.5
-    return dis
+from mv.msg import LightInfo, LightsInfo
+from light_processing import process_frame
 
 
 class Camera(object):
@@ -53,8 +23,7 @@ class Camera(object):
         self.width = width
         self.height = height
         self.bridge = CvBridge()
-        self.image_pub = rospy.Publisher("/camera/color/image_raw", Image, queue_size=30)
-        self.cam_sub = rospy.Subscriber("/vrpn_client_node/IRSWARM1/pose", PoseStamped, self.cam_callback)
+        self.light_pub = rospy.Publisher('/lightsinfo', LightsInfo, queue_size=30)
         # initialize camera parameters
         self.DevList = []
         self.hCamera = 0
@@ -62,13 +31,6 @@ class Camera(object):
         self.pFrameBuffer = None
         self.shutter = [10000, 5000, 2500, 1250, 625, 312, 156, 78, 39, 19, 9, 5, 2, 1]
         self.fps = fps
-        # paramatars from calibration
-        self.cam_R = np.zeros([3, 3])
-        self.cam_euler = np.array([0, 0, 0])
-        self.cam_pose = np.array([0, 0, 0])
-        self.car_R = np.zeros([3, 3])
-        self.car_euler = np.array([0, 0, 0])
-        self.car_pose = np.array([0, 0, 0])
         self.exposure = 312
         self.k = 0
         self.b = 0
@@ -76,11 +38,7 @@ class Camera(object):
         self.pixel_loc = []
         self.frame_ave_value = 0
         self.frame_max_value = 0
-        # store data
-        self.true_data = {'time': [], 'cam_pose': [], 'cam_R': [], 'cam_euler': [], 'car_pose': [], 'car_R': [],
-                          'car_euler': [], 'true_dis': [], 'calculated_dis': [], 'cam_exp': [], 'val': [], 'loc': [],
-                          'frame_ave_value': []}
-
+        
     def initialization(self):
         # 枚举相机
         self.DevList = mvsdk.CameraEnumerateDevice()
@@ -132,18 +90,13 @@ class Camera(object):
         self.pFrameBuffer = mvsdk.CameraAlignMalloc(self.FrameBufferSize, 16)
 
         # initialize exposure time
-        # self.exposure_adjustment()
-        mvsdk.CameraSetExposureTime(self.hCamera, self.exposure)
+        self.exposure_adjustment()
+        # mvsdk.CameraSetExposureTime(self.hCamera, self.exposure)
 
     def get_frame(self):
         pRawData, FrameHead = mvsdk.CameraGetImageBuffer(self.hCamera, 200)
         mvsdk.CameraImageProcess(self.hCamera, pRawData, self.pFrameBuffer, FrameHead)
         mvsdk.CameraReleaseImageBuffer(self.hCamera, pRawData)
-
-        # windows下取到的图像数据是上下颠倒的，以BMP格式存放。转换成opencv则需要上下翻转成正的
-        # linux下直接输出正的，不需要上下翻转
-        if platform.system() == "Windows":
-            mvsdk.CameraFlipFrameBuffer(self.pFrameBuffer, FrameHead, 1)
 
         # 此时图片已经存储在pFrameBuffer中，对于彩色相机pFrameBuffer=RGB数据，黑白相机pFrameBuffer=8位灰度数据
         # 把pFrameBuffer转换成opencv的图像格式以进行后续算法处理
@@ -153,38 +106,9 @@ class Camera(object):
             (FrameHead.iHeight, FrameHead.iWidth, 1 if FrameHead.uiMediaType == mvsdk.CAMERA_MEDIA_TYPE_MONO8 else 3))
 
         frame = cv2.resize(frame, (640, 480), interpolation=cv2.INTER_LINEAR)
-        cv2.imshow("Press q to end", frame)
+        # cv2.imshow("Press q to end", frame)
 
         return frame
-
-    def publish_frame(self, frame):
-        ros_image = self.bridge.cv2_to_imgmsg(frame, "mono8")
-        ros_image.header.stamp = rospy.Time.now()
-        self.image_pub.publish(ros_image)
-
-    def cam_callback(self, msg):
-        # vicon消息
-        global M_tool2vicon
-        self.cam_R = get_matrix_from_quaternion(msg.pose.orientation)
-        self.cam_euler = get_euler_from_quaternion(msg.pose.orientation)
-        self.cam_pose = [msg.pose.position.x, msg.pose.position.y, msg.pose.position.z]
-        M_tool2vicon = get_homogenious(msg.pose.orientation, msg.pose.position)
-        # 例如，打印vicon的位置信息
-        # print("Received vicon position:", msg.pose.position.x, msg.pose.position.y, msg.pose.position.z)
-
-    def car_callback(self, msg):
-        # vicon消息
-        global M_car2vicon
-        self.car_R = get_matrix_from_quaternion(msg.pose.orientation)
-        self.car_euler = get_euler_from_quaternion(msg.pose.orientation)
-        self.car_pose = [msg.pose.position.x, msg.pose.position.y, msg.pose.position.z]
-        M_car2vicon = get_homogenious(msg.pose.orientation, msg.pose.position)
-        # 例如，打印vicon的位置信息
-        # print("Received vicon position:", msg.pose.position.x, msg.pose.position.y, msg.pose.position.z)
-
-    def calculate_distance(self, pixel_sum):
-        dis = ((pixel_sum / self.exposure - self.b) / self.k) ** 0.5
-        return dis
 
     def exposure_adjustment(self, low=1, high=100000):
         target_pixel_value = 150
@@ -231,95 +155,18 @@ class Camera(object):
         # 微调曝光时间
         self.exposure = best_exposure_time
 
-    def mask(self,frame):
+    def mask(self, frame):
+        # 调用功能模块中的函数处理图像
+        self.pixel_loc, self.pixel_sum = process_frame(frame)
 
-        # 计算图像的平均像素值
-        self.frame_ave_value = cv2.mean(frame)[0]
+        # 根据处理结果发布消息
+        lights = []
+        for i, (center_x, center_y) in enumerate(self.pixel_loc):
+            print(f"亮点中心坐标{i + 1}: ({center_x}, {center_y}); Pixel Sum: {self.pixel_sum[i]}")
+            lights.append(LightInfo(x=center_x, y=center_y, distance=self.pixel_sum[i]))
 
-        # 设置阈值为图像平均像素值的一定倍数
-        threshold = 2 * self.frame_ave_value
-        _, mask1 = cv2.threshold(frame, threshold, 255, cv2.THRESH_BINARY)
-
-        # # 确保 mask 是 8 位单通道图像
-        if len(mask1.shape) == 3:  # 如果 mask 是三通道，转换为单通道
-            mask1 = cv2.cvtColor(mask1, cv2.COLOR_BGR2GRAY)
-
-        # 多光源目标检测
-        # # 使用开运算减少噪声
-        # kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3,3))
-        # mask = cv2.morphologyEx(mask1, cv2.MORPH_OPEN, kernel)
-
-        # 查找蒙版中的轮廓（即光源区域）
-        contours, _ = cv2.findContours(mask1, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        centers = []
-        # print(contours)
-
-        if contours:
-            for contour in contours:
-                if cv2.contourArea(contour) > 1:  # 忽略面积过小的噪声
-                    # 计算每个亮点的矩（moments），用于计算中心
-                    moments = cv2.moments(contour)
-                    if moments["m00"] != 0:  # 避免除以零
-                        center_x = int(moments["m10"] / moments["m00"])
-                        center_y = int(moments["m01"] / moments["m00"])
-                        centers.append([center_x, center_y])
-                        print(f"亮点中心坐标: ({center_x}, {center_y})")
-
-        # 可将亮点中心绘制在原图上
-        for idx, [center_x, center_y] in enumerate(centers):
-            # 在图像上绘制圆形框（假设半径为 10）
-            radius = 5
-            # offset_x = -20
-            # offset_y = 8
-            # text_positions = []
-            # # 在图像上绘制圆形框（绿色，2 像素宽）
-            cv2.circle(frame, (center_x, center_y), radius, (0, 255, 0), 2)
-
-            # # 设置 ID 显示位置，稍微向右偏移 `offset`，避免与圆形框重叠
-            # # id_position = (center_x + radius + offset_x, center_y - radius - offset_y)
-            # # cv2.putText(frame, f"ID:{idx + 1}", id_position,
-            #             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
-
-            # 提取圆形框内的像素值区域
-            mask2 = np.zeros(frame.shape[:2], dtype=np.uint8)  # 创建一个与图像大小相同的黑色遮罩
-            cv2.circle(mask2, (center_x, center_y), radius, 255, -1)  # 在遮罩上绘制白色圆形
-
-            # 通过遮罩提取圆形区域的像素值
-            masked_region = cv2.bitwise_and(frame, frame, mask=mask2)
-
-            # 计算该区域的像素值总和
-            self.pixel_sum = np.sum(masked_region)
-
-            # 打印像素值总和（这里按通道分开显示，总和是 RGB 各个通道的总和）
-            #print(f"ID: {idx + 1}, Pixel Sum: {pixel_sum}")
-
-        # 可视化蒙版和结果
-        # cv2.imshow("Mask1", mask1)
-        # cv2.imshow("Mask2", mask2)
-        #cv2.imshow("Frame with Centers", frame)
-        #cv2.waitKey(10000)
-
-    def record_true(self, frame):
-        self.mask(frame)
-        # calculated_dis = self.calculate_distance(self.pixel_sum)
-        print(rospy.Time.now().to_nsec())
-        t = int(str(rospy.Time.now().to_nsec()))
-
-        # the structure of the data is : a list stores the data in following way: [time, camera position from vicon, camera rotation from vicon, car position from vicon, car rotation from vicon, camera exposure time, the sum of pixel value, the location of the light source in the frame]
-        self.true_data['time'].append(t)
-        self.true_data['cam_pose'].append(self.cam_pose)
-        self.true_data['cam_R'].append(self.cam_R)
-        self.true_data['cam_euler'].append(self.cam_euler)
-        self.true_data['car_pose'].append(self.cam_pose)
-        self.true_data['car_R'].append(self.cam_R)
-        self.true_data['car_euler'].append(self.car_euler)
-        self.true_data['true_dis'].append(record_distance(self.cam_pose, self.car_pose))
-        # self.true_data['calculated_dis'].append(calculated_dis)
-        self.true_data['cam_exp'].append(self.exposure)
-        self.true_data['val'].append(self.pixel_sum)
-        self.true_data['loc'].append(self.pixel_loc)
-        self.true_data['frame_ave_value'].append(self.frame_ave_value)
-        # self.true_data['frame_max_value'].append(self.frame_max_value)
+        lights_info = LightsInfo(lights=lights)
+        self.light_pub.publish(lights_info)
 
     def release(self):
         # 关闭相机
@@ -332,19 +179,14 @@ class Camera(object):
 if __name__ == '__main__':
     cam = Camera()
     # folder_name = input('input the folder name:')
-    folder_name = '1'
-    image_dir = f"Data/cam1/{folder_name}/"
-    pose_dir = f"Data/cam1/{folder_name}/data.mat"
+    folder_name = '2'
+    image_dir = f"Data/{folder_name}/cam1/"
     if not os.path.exists(image_dir):
         # 在Linux中创建目录
         os.makedirs(image_dir)
-        
-    if not os.path.exists(pose_dir):
-        # 在Linux中创建目录
-        os.makedirs(pose_dir)
 
     try:
-        r = rospy.Rate(30)  # 30hz
+        r = rospy.Rate(60)  # 30hz
         cam.initialization()
 
         while not rospy.is_shutdown():
@@ -363,8 +205,6 @@ if __name__ == '__main__':
             # if np.max(frame) >= 200 or np.max(frame) <= 100:
             #     cam.exposure_adjustment()
 
-            # cam.publish_frame(frame)  # Publish the image as a ROS topic
-
             if cv2.waitKey(1) & 0xFF in [ord('q'), 27]:
                 break
 
@@ -374,8 +214,4 @@ if __name__ == '__main__':
         pass
     finally:
         cam.release()
-        cv2.destroyAllWindows()
-        for key, value in cam.true_data.items():
-            cam.true_data[key] = np.array(value)
-        savemat(pose_dir, cam.true_data)
-        print('save file successfully')
+        print('camera1 has closed')
