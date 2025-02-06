@@ -1,0 +1,6 @@
+build/
+install/
+devel/
+logs/
+*.pyc
+*.so
