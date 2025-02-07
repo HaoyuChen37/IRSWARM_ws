@@ -18,12 +18,12 @@ from light_processing import process_frame
 
 
 class Camera(object):
-    def __init__(self, width=1280, height=720, fps=30):
+    def __init__(self, width=1280, height=720, fps=100):
         rospy.init_node('mindvision_camera_node1', anonymous=True)
         self.width = width
         self.height = height
         self.bridge = CvBridge()
-        self.light_pub = rospy.Publisher('/lightsinfo', LightsInfo, queue_size=30)
+        self.light_pub = rospy.Publisher('/lightsinfo', LightsInfo, queue_size=100)
         # initialize camera parameters
         self.DevList = []
         self.hCamera = 0
@@ -186,7 +186,7 @@ if __name__ == '__main__':
         os.makedirs(image_dir)
 
     try:
-        r = rospy.Rate(60)  # 30hz
+        r = rospy.Rate(100)  # 30hz
         cam.initialization()
 
         while not rospy.is_shutdown():
