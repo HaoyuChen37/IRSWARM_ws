@@ -13,7 +13,7 @@ import platform
 from scipy.io import savemat
 import tf
 from datetime import datetime
-from mv.msg import LightInfo, LightsInfo
+from mv.msg import LightInfo, Cam1
 from light_processing import process_frame
 
 
@@ -23,7 +23,7 @@ class Camera(object):
         self.width = width
         self.height = height
         self.bridge = CvBridge()
-        self.light_pub = rospy.Publisher('/lightsinfo', LightsInfo, queue_size=100)
+        self.light_pub = rospy.Publisher('/Cam1', Cam1, queue_size=100)
         # initialize camera parameters
         self.DevList = []
         self.hCamera = 0
@@ -163,9 +163,9 @@ class Camera(object):
         lights = []
         for i, (center_x, center_y) in enumerate(self.pixel_loc):
             print(f"亮点中心坐标{i + 1}: ({center_x}, {center_y}); Pixel Sum: {self.pixel_sum[i]}")
-            lights.append(LightInfo(x=center_x, y=center_y, distance=self.pixel_sum[i]))
+            lights.append(LightInfo(x=center_x, y=center_y, strength=self.pixel_sum[i]))
 
-        lights_info = LightsInfo(lights=lights)
+        lights_info = Cam1(lights=lights)
         self.light_pub.publish(lights_info)
 
     def release(self):
@@ -200,7 +200,7 @@ if __name__ == '__main__':
                 if e.error_code != mvsdk.CAMERA_STATUS_TIME_OUT:
                     print("CameraGetImageBuffer failed({}): {}".format(e.error_code, e.message))
 
-            cam.record_true(frame)
+            cam.mask(frame)
 
             # if np.max(frame) >= 200 or np.max(frame) <= 100:
             #     cam.exposure_adjustment()

@@ -32,8 +32,7 @@ def process_frame(frame):
 
     # 如果没有轮廓，直接返回像素值总和为 0
     if not contours:
-        pixel_sums.append(0)
-        return pixel_sums
+        pass
 
     # 遍历每个轮廓
     for contour in contours:
@@ -72,4 +71,4 @@ def process_frame(frame):
     # if not pixel_sums:
     #     pixel_sums = [0]
 
-    return pixel_sums
+    return centers, pixel_sums

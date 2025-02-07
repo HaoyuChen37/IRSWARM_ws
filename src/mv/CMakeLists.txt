@@ -51,7 +51,10 @@ find_package(catkin REQUIRED COMPONENTS
 add_message_files(
   FILES
   LightInfo.msg
-  LightsInfo.msg
+  Cam1.msg
+  Cam2.msg
+  Cam3.msg
+  Cam4.msg
 )
 
 ## Generate services in the 'srv' folder

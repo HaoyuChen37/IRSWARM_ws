@@ -61,3 +61,7 @@ test_results/
 
 # 忽略ROS包的配置文件
 *.catkin_workspace
+
+# 忽略运行产生的数据
+/Data
+/Camera
