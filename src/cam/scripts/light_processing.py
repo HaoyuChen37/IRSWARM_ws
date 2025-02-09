@@ -5,9 +5,6 @@ import rospy
 import tf
 
 
-car_ID = 1
-
-
 # 外参矩阵
 cam_homogeneous_matrices = [
     np.array([
@@ -95,6 +92,9 @@ class LightLocalizer():
             (1, 3): cam_homogeneous_matrices[3],
             # 添加其他小车和相机组合...
         }
+        # 添加ROI半径参数
+        self.roi_radius = 30  # 像素单位
+        # 添加小车坐标接收端
         self.car1_sub = rospy.Subscriber("/vicon/IRSWARM1/IRSWARM1", TransformStamped, self.car1_callback)
         self.car2_sub = rospy.Subscriber("/vicon/IRSWARM2/IRSWARM2", TransformStamped, self.car2_callback)
         self.car3_sub = rospy.Subscriber("/vicon/IRSWARM3/IRSWARM3", TransformStamped, self.car3_callback)
@@ -120,8 +120,18 @@ class LightLocalizer():
     def car5_callback(self, msg):
         # vicon消息
         self.T_vicon2car5 = get_homogenious(msg.pose.orientation, msg.pose.position)
-        
-    def project_light_to_image(self, car_id, cam_id):
+
+    def create_roi_mask(self, projected_pt, img_shape):
+        """根据投影点创建圆形ROI掩膜"""
+        mask = np.zeros(img_shape[:2], dtype=np.uint8)
+        if projected_pt is not None:
+            u, v = projected_pt
+            # 检查坐标是否在图像范围内
+            if 0 <= u < img_shape[1] and 0 <= v < img_shape[0]:
+                cv2.circle(mask, (u, v), self.roi_radius, 255, -1)
+        return mask
+    
+    def project_light_to_image(self, self_car_id, self_cam_id, target_car_id, target_cam_id):
             """核心投影函数：从VICON坐标系到图像平面"""
             try:
                 # 1. 获取当前小车的位姿
@@ -131,98 +141,81 @@ class LightLocalizer():
                     3: self.vicon.T_vicon2car3,
                     4: self.vicon.T_vicon2car4,
                     5: self.vicon.T_vicon2car5
-                }[car_id]
+                }[self_car_id]
                 
                 # 2. 获取相机外参矩阵（小车到相机）
-                T_car_to_cam = self.cam_extrinsics[(car_id, cam_id)]
+                T_car_to_cam = self.cam_extrinsics[(self_car_id, self_cam_id)]
                 
                 # 3. 组合变换矩阵：VICON -> 小车 -> 相机
                 T_vicon_to_cam = T_car_to_cam @ np.linalg.inv(T_vicon_to_car)
                 
-                # 4. 转换光源坐标到相机坐标系
-                light_pos_vicon = T_vicon_to_car @ self.light_pos_car
-                light_pos_cam = T_vicon_to_cam @ light_pos_vicon
+                #  4. 转换光源坐标到相机坐标系
+                # 假设小车的位置坐标就是光源坐标
+                light_pos_vicon = np.array([0, 0, 0, 1])  # 小车坐标系下的光源位置
+                light_pos_vicon = T_vicon_to_car @ light_pos_vicon  # 转换到VICON坐标系
+                light_pos_cam = T_vicon_to_cam @ light_pos_vicon  # 转换到相机坐标系
                 
                 # 5. 考虑畸变的投影
                 cam_coords = light_pos_cam[:3].reshape(1, 3)
                 proj_points, _ = cv2.projectPoints(
                     cam_coords, 
-                    np.zeros(3),  # 假设无旋转平移
+                    cv2.Rodrigues(R),  # 假设无旋转平移
                     np.zeros(3),
                     self.camera_matrix,
                     self.dist_coeffs
                 )
                 u, v = proj_points[0][0].astype(int)
                 
-                return (u, v), light_pos_vicon[:3]
+                return (u, v)
             except KeyError:
-                return None, None
+                return None
 
-def process_frame(frame):
-    """
-    对输入的图像帧进行处理，识别图像中的亮点并计算其像素值总和。
+    def process_roi(self, frame, roi_mask):
+            """在ROI区域内处理图像并返回光源信息"""
+            # 应用ROI掩膜
+            masked_frame = cv2.bitwise_and(frame, frame, mask=roi_mask)
+            
+            # 计算图像的平均像素值（仅在ROI区域内）
+            roi_mean = cv2.mean(frame, mask=roi_mask)[0]
+            
+            # 动态调整阈值
+            threshold = 2 * roi_mean if roi_mean > 10 else 50
+            _, binary = cv2.threshold(masked_frame, threshold, 255, cv2.THRESH_BINARY)
+            
+            # 查找轮廓
+            contours, _ = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            
+            centers = []
+            pixel_sums = []
+            
+            for contour in contours:
+                # 轮廓面积过滤
+                area = cv2.contourArea(contour)
+                if 4 < area < 80:
+                    # 计算质心
+                    M = cv2.moments(contour)
+                    if M["m00"] != 0:
+                        cx = int(M["m10"] / M["m00"])
+                        cy = int(M["m01"] / M["m00"])
+                        
+                        # 计算像素值总和
+                        mask = np.zeros_like(frame)
+                        cv2.drawContours(mask, [contour], -1, 255, -1)
+                        pixel_sum = cv2.sumElems(frame, mask=mask)[0]
+                        
+                        centers.append((cx, cy))
+                        pixel_sums.append(pixel_sum)
+            
+            return centers, pixel_sums
+    
+    def process_frame(self, frame, car_id=1, cam_id=0):
+        """完整的定位流程"""
+        # 获取投影点
+        projected_pt = self.project_light_to_image(car_id, cam_id)
 
-    参数:
-        frame (numpy.ndarray): 输入的图像帧（单通道或三通道）。
+        # 创建ROI掩膜
+        roi_mask = self.create_roi_mask(projected_pt, frame.shape)
 
-    返回:
-        list: 包含每个亮点的像素值总和的列表。
-    """
-    # 计算图像的平均像素值
-    frame_ave_value = cv2.mean(frame)[0]
-
-    # 设置阈值为图像平均像素值的一定倍数
-    threshold = 2 * frame_ave_value
-    _, mask1 = cv2.threshold(frame, threshold, 255, cv2.THRESH_BINARY)
-
-    # 确保 mask 是 8 位单通道图像
-    if len(mask1.shape) == 3:  # 如果 mask 是三通道，转换为单通道
-        mask1 = cv2.cvtColor(mask1, cv2.COLOR_BGR2GRAY)
-
-    # 查找蒙版中的轮廓（即光源区域）
-    contours, _ = cv2.findContours(mask1, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    centers = []
-    pixel_sums = []
-
-    # 如果没有轮廓，直接返回像素值总和为 0
-    if not contours:
-        pass
-
-    # 遍历每个轮廓
-    for contour in contours:
-        contour_area = cv2.contourArea(contour)  # 计算轮廓的面积
-
-        # 计算每个亮点的矩（moments），用于计算中心
-        moments = cv2.moments(contour)
-        center_x = 0
-        center_y = 0
-        if moments["m00"] != 0:  # 避免除以零（像素个数不为0）
-            center_x = int(moments["m10"] / moments["m00"])
-            center_y = int(moments["m01"] / moments["m00"])
-
-        if center_y > 150:
-            if contour_area >= 80:  # 不太可能出现
-                pixel_sum = 1  # 没有光源但有vicon
-                # pixel_sums.append(pixel_sum)
-            elif 2 < contour_area < 80.0:  # 忽略过小的噪声且只处理面积小于80的轮廓
-                # 计算每个亮点的像素值总和
-                mask2 = np.zeros_like(frame, dtype=np.uint8)
-                if len(mask2.shape) == 3:  # 如果 mask 是三通道，转换为单通道
-                    mask2 = cv2.cvtColor(mask2, cv2.COLOR_BGR2GRAY)
-                cv2.drawContours(mask2, [contour], -1, (255, 255, 255), thickness=cv2.FILLED)
-                masked_image = cv2.bitwise_and(frame, frame, mask=mask2)
-                pixel_sum = cv2.sumElems(masked_image)[0]
-                pixel_sums.append(pixel_sum)
-                centers.append((center_x, center_y))
-            else:  # 位置较低的噪声（窗户）
-                pixel_sum = 2
-                # pixel_sums.append(pixel_sum)
-        else:  # vicon或位置较高的噪声（窗户）
-            pixel_sum = 1  # 没有光源但有vicon
-            # pixel_sums.append(pixel_sum)
-
-    # # 如果 pixel_sums 为空，则赋值为 [0]
-    # if not pixel_sums:
-    #     pixel_sums = [0]
-
-    return centers, pixel_sums
+        # 处理ROI区域
+        centers, pixel_sums = self.process_roi(frame, roi_mask)
+        return centers, pixel_sums
