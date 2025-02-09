@@ -1,9 +1,6 @@
 import cv2
 import numpy as np
-
-import cv2
-import numpy as np
-
+import pdb
 def process_frame(frame):
     """
     对输入的图像帧进行处理，识别图像中的亮点并计算其像素值总和。
@@ -14,12 +11,26 @@ def process_frame(frame):
     返回:
         list: 包含每个亮点的像素值总和的列表。
     """
+    pdb.set_trace()
+    single_frame = frame[:, :, 0]
+    single_frame = cv2.medianBlur(single_frame, 3)
+    max_frame = np.max(single_frame)
+    
+    single_frame = single_frame * 5
+    poses = np.where(single_frame == max_frame)
+    
+    cv2.imshow('frame', single_frame)
+    cv2.waitKey(0)
     # 计算图像的平均像素值
     frame_ave_value = cv2.mean(frame)[0]
 
     # 设置阈值为图像平均像素值的一定倍数
     threshold = 2 * frame_ave_value
-    _, mask1 = cv2.threshold(frame, threshold, 255, cv2.THRESH_BINARY)
+    # _, mask1 = cv2.threshold(frame, threshold, 255, cv2.THRESH_BINARY)
+    _, mask1 = cv2.threshold(frame[:,:,0], 0, 255, cv2.THRESH_OTSU)
+    cv2.imshow("Mask1", mask1)
+    cv2.imshow("Frame", frame)
+    cv2.waitKey(0)
 
     # 确保 mask 是 8 位单通道图像
     if len(mask1.shape) == 3:  # 如果 mask 是三通道，转换为单通道

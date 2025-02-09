@@ -16,7 +16,7 @@ def mask(frame):
     frame_ave_value = cv2.mean(frame)[0]
 
     # 设置阈值为图像平均像素值的一定倍数
-    threshold = 2 * frame_ave_value
+    threshold = 1 * frame_ave_value
     _, mask1 = cv2.threshold(frame, threshold, 255, cv2.THRESH_BINARY)
 
     # # 确保 mask 是 8 位单通道图像
@@ -137,25 +137,25 @@ def mask(frame):
                 logging.info(f"Pixel Sum05{i + 1}:{pixel_sum} {contour_area}")
 
 
-        #     logging.info(f"Pixel Sum:{pixel_sums}")
-        #
-        #     print(f"亮点中心坐标{i+1}: ({center_x}, {center_y});Pixel Sum: {pixel_sum}")
-        #
-        #     # 可将亮点中心绘制在原图上
-        #     radius = 5
-        #     offset_x = -10#-20
-        #     offset_y = -30#8
-        #     # # 在图像上绘制圆形框（绿色，2 像素宽）
-        #     cv2.circle(frame, (center_x, center_y), radius, (0, 255, 0), 2)
-        #     id_position = (center_x + radius + offset_x, center_y - radius - offset_y)
-        #     # 设置 ID 显示位置，稍微向右偏移 `offset`，避免与圆形框重叠
-        #     cv2.putText(frame, f"ID:{i + 1}", id_position,
-        #             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+            logging.info(f"Pixel Sum:{pixel_sums}")
+        
+            print(f"亮点中心坐标{i+1}: ({center_x}, {center_y});Pixel Sum: {pixel_sum}")
+        
+            # 可将亮点中心绘制在原图上
+            radius = 5
+            offset_x = -10#-20
+            offset_y = -30#8
+            # # 在图像上绘制圆形框（绿色，2 像素宽）
+            cv2.circle(frame, (center_x, center_y), radius, (0, 255, 0), 2)
+            id_position = (center_x + radius + offset_x, center_y - radius - offset_y)
+            # 设置 ID 显示位置，稍微向右偏移 `offset`，避免与圆形框重叠
+            cv2.putText(frame, f"ID:{i + 1}", id_position,
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
         # # 可视化蒙版和结果
-        # cv2.imshow("Mask1", mask1)
-        # cv2.imshow("Frame with Centers", frame)
-        # cv2.imshow("Mask2", mask2)
-        # cv2.waitKey(10000)
+        cv2.imshow("Mask1", mask1)
+        cv2.imshow("Frame with Centers", frame)
+        cv2.imshow("Mask2", mask2)
+        cv2.waitKey(10000)
         #如果 pixel_sums 为空，则赋值为 [0]
         if not pixel_sums:
             pixel_sums = [0]
@@ -169,7 +169,7 @@ def mask(frame):
 
 if __name__=="__main__":
 
-    image_path = r"D:\Data\cam1\datanew\0116125804600038.png"
+    image_path = f"/home/chenhaoyu/IRSWARM_ws/src/mv/scripts/0207155201770955.png"
     # image_path = r"D:\test_vscode\pycharmproject\data\vicon.png"
     # 0116125601699770  0116125603166391  0116125604899799  0116125632499739 0116125905499759
     frame = cv2.imread(image_path)  # image本是RAW格式单通道，但是cv2.read的函数会默认将它读成三通道图像结果

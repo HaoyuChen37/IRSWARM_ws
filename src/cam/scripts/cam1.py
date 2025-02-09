@@ -4,14 +4,12 @@ import os
 from datetime import datetime
 import rospy
 from sensor_msgs.msg import Image
-from geometry_msgs.msg import TransformStamped
 import cv2
 from cv_bridge import CvBridge
 import numpy as np
 import mvsdk
 import platform
 from scipy.io import savemat
-import tf
 from datetime import datetime
 from mv.msg import LightInfo, Cam1
 from light_processing import process_frame
@@ -174,6 +172,7 @@ class Camera(object):
 
         # 释放帧缓存
         mvsdk.CameraAlignFree(self.pFrameBuffer)
+    
 
 
 if __name__ == '__main__':
