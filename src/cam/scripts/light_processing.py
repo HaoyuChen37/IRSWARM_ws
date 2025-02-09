@@ -131,44 +131,70 @@ class LightLocalizer():
                 cv2.circle(mask, (u, v), self.roi_radius, 255, -1)
         return mask
     
-    def project_light_to_image(self, self_car_id, self_cam_id, target_car_id, target_cam_id):
-            """核心投影函数：从VICON坐标系到图像平面"""
-            try:
-                # 1. 获取当前小车的位姿
-                T_vicon_to_car = {
-                    1: self.vicon.T_vicon2car1,
-                    2: self.vicon.T_vicon2car2,
-                    3: self.vicon.T_vicon2car3,
-                    4: self.vicon.T_vicon2car4,
-                    5: self.vicon.T_vicon2car5
-                }[self_car_id]
-                
-                # 2. 获取相机外参矩阵（小车到相机）
-                T_car_to_cam = self.cam_extrinsics[(self_car_id, self_cam_id)]
-                
-                # 3. 组合变换矩阵：VICON -> 小车 -> 相机
-                T_vicon_to_cam = T_car_to_cam @ np.linalg.inv(T_vicon_to_car)
-                
-                #  4. 转换光源坐标到相机坐标系
-                # 假设小车的位置坐标就是光源坐标
-                light_pos_vicon = np.array([0, 0, 0, 1])  # 小车坐标系下的光源位置
-                light_pos_vicon = T_vicon_to_car @ light_pos_vicon  # 转换到VICON坐标系
-                light_pos_cam = T_vicon_to_cam @ light_pos_vicon  # 转换到相机坐标系
-                
-                # 5. 考虑畸变的投影
-                cam_coords = light_pos_cam[:3].reshape(1, 3)
-                proj_points, _ = cv2.projectPoints(
-                    cam_coords, 
-                    cv2.Rodrigues(R),  # 假设无旋转平移
-                    np.zeros(3),
-                    self.camera_matrix,
-                    self.dist_coeffs
-                )
-                u, v = proj_points[0][0].astype(int)
-                
-                return (u, v)
-            except KeyError:
-                return None
+    def project_all_lights_to_image(self, self_car_id, self_cam_id):
+        projections = {}
+        try:
+            # 获取当前相机的位姿参数
+            T_self_car_to_cam = self.cam_extrinsics[(self_car_id, self_cam_id)]
+            R_self_cam = T_self_car_to_cam[:3, :3]
+            t_self_cam = T_self_car_to_cam[:3, 3]
+            rvec_self_cam, _ = cv2.Rodrigues(R_self_cam)
+            
+            # 获取当前小车的VICON位姿 (T_vicon_to_self_car)
+            T_vicon_to_self_car = {
+                1: self.T_vicon2car1,
+                2: self.T_vicon2car2,
+                3: self.T_vicon2car3,
+                4: self.T_vicon2car4,
+                5: self.T_vicon2car5
+            }[self_car_id]
+            
+            # 遍历所有其他小车
+            for target_car_id in range(1, 6):
+                if target_car_id == self_car_id:
+                    continue
+                    
+                try:
+                    # 获取目标小车的VICON位姿 (T_vicon_to_target_car)
+                    T_vicon_to_target_car = {
+                        1: self.T_vicon2car1,
+                        2: self.T_vicon2car2,
+                        3: self.T_vicon2car3,
+                        4: self.T_vicon2car4,
+                        5: self.T_vicon2car5
+                    }[target_car_id]
+                    T_target_car_to_vicon = np.linalg.inv(T_vicon_to_target_car)
+                    
+                    # 构建正确变换链
+                    T_total = T_self_car_to_cam @ T_vicon_to_self_car @ T_target_car_to_vicon
+                    
+                    # 转换光源位置（目标小车坐标系原点）
+                    light_pos_cam = T_total @ np.array([0, 0, 0, 1.0])
+                    x, y, z, _ = light_pos_cam
+                    
+                    # 投影到图像
+                    proj_points, _ = cv2.projectPoints(
+                        np.array([[x, y, z]], dtype=np.float32),
+                        rvec_self_cam,
+                        t_self_cam,
+                        self.camera_matrix,
+                        self.dist_coeffs
+                    )
+                    u, v = proj_points[0][0].astype(int)
+                    
+                    # 验证坐标有效性
+                    if 0 <= u < 640 and 0 <= v < 480:  # 假设图像尺寸640x480
+                        projections[target_car_id] = (u, v)
+                    else:
+                        projections[target_car_id] = None
+                        
+                except KeyError:
+                    projections[target_car_id] = None
+                    
+        except KeyError:
+            pass
+        
+        return projections
 
     def process_roi(self, frame, roi_mask):
             """在ROI区域内处理图像并返回光源信息"""
