@@ -12,7 +12,7 @@ import platform
 from scipy.io import savemat
 from datetime import datetime
 from mv.msg import LightInfo, Cam1
-from light_processing import process_frame
+from light_processing import LightLocalizer
 
 
 class Camera(object):
@@ -154,8 +154,10 @@ class Camera(object):
         self.exposure = best_exposure_time
 
     def mask(self, frame):
-        # 调用功能模块中的函数处理图像
-        self.pixel_loc, self.pixel_sum = process_frame(frame)
+    	# 创建 LightLocalizer 类的实例
+        localizer = LightLocalizer()
+        # 调用 process_frame 方法
+        self.pixel_loc, self.pixel_sum = localizer.process_frame(frame)
 
         # 根据处理结果发布消息
         lights = []
@@ -185,7 +187,7 @@ if __name__ == '__main__':
         os.makedirs(image_dir)
 
     try:
-        r = rospy.Rate(100)  # 30hz
+        r = rospy.Rate(100)  # 100hz
         cam.initialization()
 
         while not rospy.is_shutdown():

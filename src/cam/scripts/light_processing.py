@@ -125,10 +125,21 @@ class LightLocalizer():
         """根据投影点创建圆形ROI掩膜"""
         mask = np.zeros(img_shape[:2], dtype=np.uint8)
         if projected_pt is not None:
-            u, v = projected_pt
-            # 检查坐标是否在图像范围内
-            if 0 <= u < img_shape[1] and 0 <= v < img_shape[0]:
-                cv2.circle(mask, (u, v), self.roi_radius, 255, -1)
+            # 如果 projected_pt 是一个字典，提取第一个投影点
+            if isinstance(projected_pt, dict):
+                # 假设我们只关心第一个投影点
+                for target_car_id, pt in projected_pt.items():
+                    if pt is not None:
+                        u, v = pt
+                        # 检查坐标是否在图像范围内
+                        if 0 <= u < img_shape[1] and 0 <= v < img_shape[0]:
+                            cv2.circle(mask, (u, v), self.roi_radius, 255, -1)
+            else:
+                # 如果 projected_pt 是一个元组，直接使用
+                u, v = projected_pt
+                # 检查坐标是否在图像范围内
+                if 0 <= u < img_shape[1] and 0 <= v < img_shape[0]:
+                    cv2.circle(mask, (u, v), self.roi_radius, 255, -1)
         return mask
     
     def project_all_lights_to_image(self, self_car_id, self_cam_id):
@@ -202,10 +213,10 @@ class LightLocalizer():
             masked_frame = cv2.bitwise_and(frame, frame, mask=roi_mask)
             
             # 计算图像的平均像素值（仅在ROI区域内）
-            roi_mean = cv2.mean(frame, mask=roi_mask)[0]
+            frame_mean = cv2.mean(frame)[0]
             
             # 动态调整阈值
-            threshold = 2 * roi_mean if roi_mean > 10 else 50
+            threshold = 2 * frame_mean
             _, binary = cv2.threshold(masked_frame, threshold, 255, cv2.THRESH_BINARY)
             
             # 查找轮廓
@@ -224,10 +235,11 @@ class LightLocalizer():
                         cx = int(M["m10"] / M["m00"])
                         cy = int(M["m01"] / M["m00"])
                         
-                        # 计算像素值总和
+                        # 计算每个亮点的像素值总和
                         mask = np.zeros_like(frame)
                         cv2.drawContours(mask, [contour], -1, 255, -1)
-                        pixel_sum = cv2.sumElems(frame, mask=mask)[0]
+                        masked_image = cv2.bitwise_and(frame, frame, mask=mask)
+                        pixel_sum = cv2.sumElems(masked_image)[0]
                         
                         centers.append((cx, cy))
                         pixel_sums.append(pixel_sum)
@@ -237,7 +249,7 @@ class LightLocalizer():
     def process_frame(self, frame, car_id=1, cam_id=0):
         """完整的定位流程"""
         # 获取投影点
-        projected_pt = self.project_light_to_image(car_id, cam_id)
+        projected_pt = self.project_all_lights_to_image(car_id, cam_id)
 
         # 创建ROI掩膜
         roi_mask = self.create_roi_mask(projected_pt, frame.shape)
