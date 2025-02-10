@@ -103,23 +103,23 @@ class LightLocalizer():
 
     def car1_callback(self, msg):
         # vicon消息
-        self.T_vicon2car1 = get_homogenious(msg.transform.rotation, msg.transform.translation)
+        self.T_vicon2car1 = get_homogenious(msg.pose.orientation, msg.pose.position)
         
     def car2_callback(self, msg):
         # vicon消息
-        self.T_vicon2car2 = get_homogenious(msg.transform.rotation, msg.transform.translation)
+        self.T_vicon2car2 = get_homogenious(msg.pose.orientation, msg.pose.position)
     
     def car3_callback(self, msg):
         # vicon消息
-        self.T_vicon2car3 = get_homogenious(msg.transform.rotation, msg.transform.translation)
+        self.T_vicon2car3 = get_homogenious(msg.pose.orientation, msg.pose.position)
         
     def car4_callback(self, msg):
         # vicon消息
-        self.T_vicon2car4 = get_homogenious(msg.transform.rotation, msg.transform.translation)
+        self.T_vicon2car4 = get_homogenious(msg.pose.orientation, msg.pose.position)
     
     def car5_callback(self, msg):
         # vicon消息
-        self.T_vicon2car5 = get_homogenious(msg.transform.rotation, msg.transform.translation)
+        self.T_vicon2car5 = get_homogenious(msg.pose.orientation, msg.pose.position)
 
     def create_roi_mask(self, projected_pt, img_shape):
         """根据投影点创建圆形ROI掩膜"""
