@@ -74,11 +74,11 @@ def get_homogenious(quaternion, position):
 class LightLocalizer():
     def __init__(self):
         # 初始化5个小车的齐次坐标变换矩阵
-        self.T_vicon2car1 = np.eye(4)  # Vicon 到 car1 的变换矩阵
-        self.T_vicon2car2 = np.eye(4)  # Vicon 到 car2 的变换矩阵
-        self.T_vicon2car3 = np.eye(4)  # Vicon 到 car3 的变换矩阵
-        self.T_vicon2car4 = np.eye(4)  # Vicon 到 car4 的变换矩阵
-        self.T_vicon2car5 = np.eye(4)  # Vicon 到 car5 的变换矩阵
+        self.T_car1_to_vicon = np.eye(4)  # Vicon 到 car1 的变换矩阵
+        self.T_car2_to_vicon = np.eye(4)  # Vicon 到 car2 的变换矩阵
+        self.T_car3_to_vicon = np.eye(4)  # Vicon 到 car3 的变换矩阵
+        self.T_car4_to_vicon = np.eye(4)  # Vicon 到 car4 的变换矩阵
+        self.T_car5_to_vicon = np.eye(4)  # Vicon 到 car5 的变换矩阵
         # 相机参数配置
         self.camera_matrix = np.array([ [436.04379372 ,  0.    ,     322.2056478 ],
                                         [  0.    ,     408.81252158 , 231.98256365],
@@ -103,23 +103,23 @@ class LightLocalizer():
 
     def car1_callback(self, msg):
         # vicon消息
-        self.T_vicon2car1 = get_homogenious(msg.pose.orientation, msg.pose.position)
+        self.T_car1_to_vicon = get_homogenious(msg.pose.orientation, msg.pose.position)
         
     def car2_callback(self, msg):
         # vicon消息
-        self.T_vicon2car2 = get_homogenious(msg.pose.orientation, msg.pose.position)
+        self.T_car2_to_vicon = get_homogenious(msg.pose.orientation, msg.pose.position)
     
     def car3_callback(self, msg):
         # vicon消息
-        self.T_vicon2car3 = get_homogenious(msg.pose.orientation, msg.pose.position)
+        self.T_car3_to_vicon = get_homogenious(msg.pose.orientation, msg.pose.position)
         
     def car4_callback(self, msg):
         # vicon消息
-        self.T_vicon2car4 = get_homogenious(msg.pose.orientation, msg.pose.position)
+        self.T_car4_to_vicon = get_homogenious(msg.pose.orientation, msg.pose.position)
     
     def car5_callback(self, msg):
         # vicon消息
-        self.T_vicon2car5 = get_homogenious(msg.pose.orientation, msg.pose.position)
+        self.T_car5_to_vicon = get_homogenious(msg.pose.orientation, msg.pose.position)
 
     def create_roi_mask(self, projected_pt, img_shape):
         """根据投影点创建圆形ROI掩膜"""
@@ -153,11 +153,11 @@ class LightLocalizer():
             
             # 获取当前小车的VICON位姿 (T_vicon_to_self_car)
             T_vicon_to_self_car = {
-                1: self.T_vicon2car1,
-                2: self.T_vicon2car2,
-                3: self.T_vicon2car3,
-                4: self.T_vicon2car4,
-                5: self.T_vicon2car5
+                1: self.T_car1_to_vicon,
+                2: self.T_car2_to_vicon,
+                3: self.T_car3_to_vicon,
+                4: self.T_car4_to_vicon,
+                5: self.T_car5_to_vicon
             }[self_car_id]
             
             # 遍历所有其他小车
@@ -168,11 +168,11 @@ class LightLocalizer():
                 try:
                     # 获取目标小车的VICON位姿 (T_vicon_to_target_car)
                     T_vicon_to_target_car = {
-                        1: self.T_vicon2car1,
-                        2: self.T_vicon2car2,
-                        3: self.T_vicon2car3,
-                        4: self.T_vicon2car4,
-                        5: self.T_vicon2car5
+                        1: self.T_car1_to_vicon,
+                        2: self.T_car2_to_vicon,
+                        3: self.T_car3_to_vicon,
+                        4: self.T_car4_to_vicon,
+                        5: self.T_car5_to_vicon
                     }[target_car_id]
                     T_target_car_to_vicon = np.linalg.inv(T_vicon_to_target_car)
                     
