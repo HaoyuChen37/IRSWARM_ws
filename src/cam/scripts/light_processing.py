@@ -246,7 +246,7 @@ class LightLocalizer():
             
             return centers, pixel_sums
     
-    def process_frame(self, frame, car_id=1, cam_id=0):
+    def process_frame(self, frame, car_id, cam_id):
         """完整的定位流程"""
         # 获取投影点
         projected_pt = self.project_all_lights_to_image(car_id, cam_id)

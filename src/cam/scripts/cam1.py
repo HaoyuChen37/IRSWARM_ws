@@ -36,6 +36,9 @@ class Camera(object):
         self.pixel_loc = []
         self.frame_ave_value = 0
         self.frame_max_value = 0
+        # Initialize car_id, cam_id
+        self.car_id = 1
+        self.cam_id = 0
         
     def initialization(self):
         # 枚举相机
@@ -157,7 +160,7 @@ class Camera(object):
     	# 创建 LightLocalizer 类的实例
         localizer = LightLocalizer()
         # 调用 process_frame 方法
-        self.pixel_loc, self.pixel_sum = localizer.process_frame(frame)
+        self.pixel_loc, self.pixel_sum = localizer.process_frame(frame, self.car_id, self.cam_id)
 
         # 根据处理结果发布消息
         lights = []
