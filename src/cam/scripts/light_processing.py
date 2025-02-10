@@ -6,7 +6,7 @@ import tf
 
 
 # 外参矩阵
-cam_homogeneous_matrices = [
+M_cam2hand = [
     np.array([
         [0.72119598,  0.10725118,  0.68437822,  0.04008849],
         [-0.69155041,  0.05381167,  0.720321,    0.05381581],
@@ -86,10 +86,10 @@ class LightLocalizer():
         self.dist_coeffs = np.array( [[-0.09917725 , 0.1034774  , 0.00054878,  0.0001342 , -0.01694831]])
         # 多相机外参矩阵字典：{ (小车ID, 相机ID): 外参矩阵 }
         self.cam_extrinsics = {
-            (1, 0): cam_homogeneous_matrices[0],
-            (1, 1): cam_homogeneous_matrices[1],
-            (1, 2): cam_homogeneous_matrices[2],
-            (1, 3): cam_homogeneous_matrices[3],
+            (1, 0): M_cam2hand[0],
+            (1, 1): M_cam2hand[1],
+            (1, 2): M_cam2hand[2],
+            (1, 3): M_cam2hand[3],
             # 添加其他小车和相机组合...
         }
         # 添加ROI半径参数
@@ -145,14 +145,8 @@ class LightLocalizer():
     def project_all_lights_to_image(self, self_car_id, self_cam_id):
         projections = {}
         try:
-            # 获取当前相机的位姿参数
-            T_self_car_to_cam = self.cam_extrinsics[(self_car_id, self_cam_id)]
-            R_self_cam = T_self_car_to_cam[:3, :3]
-            t_self_cam = T_self_car_to_cam[:3, 3]
-            rvec_self_cam, _ = cv2.Rodrigues(R_self_cam)
-            
-            # 获取当前小车的VICON位姿 (T_vicon_to_self_car)
-            T_vicon_to_self_car = {
+            # 获取当前小车的VICON位姿 (T_self_car_to_vicon)
+            T_self_car_to_vicon = {
                 1: self.T_car1_to_vicon,
                 2: self.T_car2_to_vicon,
                 3: self.T_car3_to_vicon,
@@ -160,32 +154,34 @@ class LightLocalizer():
                 5: self.T_car5_to_vicon
             }[self_car_id]
             
+            # 获取当前相机的位姿参数
+            T_cam_to_self_car = self.cam_extrinsics[(self_car_id, self_cam_id)]
+            T_self_car_to_cam = np.linalg.inv(T_cam_to_self_car)
+            T_vicon_to_self_car = np.linalg.inv(T_self_car_to_vicon)
+            T_vicon_to_cam = T_self_car_to_cam.dot(T_vicon_to_self_car)
+            R_self_cam = T_vicon_to_cam[:3, :3]
+            t_self_cam = T_vicon_to_cam[:3, 3]
+            rvec_self_cam, _ = cv2.Rodrigues(R_self_cam)
+
             # 遍历所有其他小车
             for target_car_id in range(1, 6):
                 if target_car_id == self_car_id:
                     continue
                     
-                try:
-                    # 获取目标小车的VICON位姿 (T_vicon_to_target_car)
-                    T_vicon_to_target_car = {
-                        1: self.T_car1_to_vicon,
-                        2: self.T_car2_to_vicon,
-                        3: self.T_car3_to_vicon,
-                        4: self.T_car4_to_vicon,
-                        5: self.T_car5_to_vicon
-                    }[target_car_id]
-                    T_target_car_to_vicon = np.linalg.inv(T_vicon_to_target_car)
-                    
-                    # 构建正确变换链
-                    T_total = T_self_car_to_cam @ T_vicon_to_self_car @ T_target_car_to_vicon
-                    
-                    # 转换光源位置（目标小车坐标系原点）
-                    light_pos_cam = T_total @ np.array([0, 0, 0, 1.0])
-                    x, y, z, _ = light_pos_cam
-                    
+                # 获取目标小车的VICON位姿 (T_target_car_to_vicon)
+                T_target_car_to_vicon = {
+                    1: self.T_car1_to_vicon,
+                    2: self.T_car2_to_vicon,
+                    3: self.T_car3_to_vicon,
+                    4: self.T_car4_to_vicon,
+                    5: self.T_car5_to_vicon
+                }[target_car_id]
+                
+                pose = T_target_car_to_vicon[:3, 3]
+                if pose != [0, 0, 0]:
                     # 投影到图像
                     proj_points, _ = cv2.projectPoints(
-                        np.array([[x, y, z]], dtype=np.float32),
+                        np.array([pose], dtype=np.float32),
                         rvec_self_cam,
                         t_self_cam,
                         self.camera_matrix,
@@ -198,8 +194,7 @@ class LightLocalizer():
                         projections[target_car_id] = (u, v)
                     else:
                         projections[target_car_id] = None
-                        
-                except KeyError:
+                else:
                     projections[target_car_id] = None
                     
         except KeyError:
