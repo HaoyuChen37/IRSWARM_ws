@@ -187,7 +187,7 @@ if __name__ == '__main__':
         os.makedirs(image_dir)
 
     try:
-        r = rospy.Rate(100)  # 100hz
+        r = rospy.Rate(1)  # 100hz
         cam.initialization()
 
         while not rospy.is_shutdown():
