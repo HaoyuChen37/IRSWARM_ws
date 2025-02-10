@@ -103,23 +103,23 @@ class LightLocalizer():
 
     def car1_callback(self, msg):
         # vicon消息
-        self.T_car1_to_vicon = get_homogenious(msg.pose.orientation, msg.pose.position)
+        self.T_car1_to_vicon = get_homogenious(msg.transform.rotation, msg.transform.translation)
         
     def car2_callback(self, msg):
         # vicon消息
-        self.T_car2_to_vicon = get_homogenious(msg.pose.orientation, msg.pose.position)
+        self.T_car2_to_vicon = get_homogenious(msg.transform.rotation, msg.transform.translation)
     
     def car3_callback(self, msg):
         # vicon消息
-        self.T_car3_to_vicon = get_homogenious(msg.pose.orientation, msg.pose.position)
+        self.T_car3_to_vicon = get_homogenious(msg.transform.rotation, msg.transform.translation)
         
     def car4_callback(self, msg):
         # vicon消息
-        self.T_car4_to_vicon = get_homogenious(msg.pose.orientation, msg.pose.position)
+        self.T_car4_to_vicon = get_homogenious(msg.transform.rotation, msg.transform.translation)
     
     def car5_callback(self, msg):
         # vicon消息
-        self.T_car5_to_vicon = get_homogenious(msg.pose.orientation, msg.pose.position)
+        self.T_car5_to_vicon = get_homogenious(msg.transform.rotation, msg.transform.translation)
 
     def create_roi_mask(self, projected_pt, img_shape):
         """根据投影点创建圆形ROI掩膜"""
@@ -178,7 +178,7 @@ class LightLocalizer():
                 }[target_car_id]
                 
                 pose = T_target_car_to_vicon[:3, 3]
-                if pose != [0, 0, 0]:
+                if not np.array_equal(pose, [0, 0, 0]):
                     # 投影到图像
                     proj_points, _ = cv2.projectPoints(
                         np.array([pose], dtype=np.float32),
@@ -196,7 +196,7 @@ class LightLocalizer():
                         projections[target_car_id] = None
                 else:
                     projections[target_car_id] = None
-                    
+
         except KeyError:
             pass
         
@@ -248,6 +248,9 @@ class LightLocalizer():
 
         # 创建ROI掩膜
         roi_mask = self.create_roi_mask(projected_pt, frame.shape)
+
+        cv2.imshow('frame', frame)
+        cv2.imshow('mask', roi_mask)
 
         # 处理ROI区域
         centers, pixel_sums = self.process_roi(frame, roi_mask)
