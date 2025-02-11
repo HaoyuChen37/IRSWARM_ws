@@ -159,9 +159,7 @@ class LightLocalizer():
             T_self_car_to_cam = np.linalg.inv(T_cam_to_self_car)
             T_vicon_to_self_car = np.linalg.inv(T_self_car_to_vicon)
             T_vicon_to_cam = T_self_car_to_cam.dot(T_vicon_to_self_car)
-            R_self_cam = T_vicon_to_cam[:3, :3]
-            t_self_cam = T_vicon_to_cam[:3, 3]
-            rvec_self_cam, _ = cv2.Rodrigues(R_self_cam)
+            
 
             # 遍历所有其他小车
             for target_car_id in range(1, 6):
@@ -180,14 +178,11 @@ class LightLocalizer():
                 pose = T_target_car_to_vicon[:3, 3]
                 if not np.array_equal(pose, [0, 0, 0]):
                     # 投影到图像
-                    proj_points, _ = cv2.projectPoints(
-                        np.array([pose], dtype=np.float32),
-                        rvec_self_cam,
-                        t_self_cam,
-                        self.camera_matrix,
-                        self.dist_coeffs
-                    )
-                    u, v = proj_points[0][0].astype(int)
+                    T_target_car_to_cam = T_vicon_to_cam.dot(T_target_car_to_vicon)
+                    marker_pos = T_target_car_to_cam[0:3, 3].reshape([3,1]) 
+                    marker_proj = self.camera_matrix.dot(marker_pos)
+                    marker_proj = marker_proj / marker_proj[2]
+                    u, v = int(marker_proj[0]), int(marker_proj[1])
                     
                     # 验证坐标有效性
                     if 0 <= u < 640 and 0 <= v < 480:  # 假设图像尺寸640x480
