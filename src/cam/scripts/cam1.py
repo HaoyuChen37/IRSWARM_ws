@@ -156,9 +156,7 @@ class Camera(object):
         # 微调曝光时间
         self.exposure = best_exposure_time
 
-    def mask(self, frame):
-    	# 创建 LightLocalizer 类的实例
-        localizer = LightLocalizer()
+    def mask(self, frame, localizer):
         # 调用 process_frame 方法
         self.pixel_loc, self.pixel_sum = localizer.process_frame(frame, self.car_id, self.cam_id)
 
@@ -192,6 +190,8 @@ if __name__ == '__main__':
     try:
         r = rospy.Rate(100)  # 100hz
         cam.initialization()
+        # 创建 LightLocalizer 类的实例
+        localizer = LightLocalizer()
 
         while not rospy.is_shutdown():
             try:
@@ -204,7 +204,7 @@ if __name__ == '__main__':
                 if e.error_code != mvsdk.CAMERA_STATUS_TIME_OUT:
                     print("CameraGetImageBuffer failed({}): {}".format(e.error_code, e.message))
 
-            cam.mask(frame)
+            cam.mask(frame, localizer)
 
             # if np.max(frame) >= 200 or np.max(frame) <= 100:
             #     cam.exposure_adjustment()

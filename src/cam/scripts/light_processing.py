@@ -7,12 +7,10 @@ import tf
 
 # 外参矩阵
 M_cam2hand = [
-    np.array([
-        [0.72119598,  0.10725118,  0.68437822,  0.04008849],
-        [-0.69155041,  0.05381167,  0.720321,    0.05381581],
-        [0.04042774, -0.99277464,  0.11297836, -0.10454239],
-        [0.,          0.,          0.,          1.        ]
-    ]),
+    np.array([[ 0.59974332 , 0.09702721 , 0.79428815 , 0.02089161],
+            [-0.79881012 , 0.01427606 , 0.60141382 , 0.1266907 ],
+            [ 0.0470142,  -0.99517934 , 0.08606829 ,-0.13001949],
+            [ 0.        ,  0.         , 0.         , 1.        ]]),
     np.array([
         [-0.72011037, -0.03127949,  0.69315413,  0.06132023],
         [-0.69241984, -0.03192476, -0.72078817, -0.03504754],
@@ -74,15 +72,15 @@ def get_homogenious(quaternion, position):
 class LightLocalizer():
     def __init__(self):
         # 初始化5个小车的齐次坐标变换矩阵
-        self.T_car1_to_vicon = np.eye(4)  # Vicon 到 car1 的变换矩阵
-        self.T_car2_to_vicon = np.eye(4)  # Vicon 到 car2 的变换矩阵
-        self.T_car3_to_vicon = np.eye(4)  # Vicon 到 car3 的变换矩阵
-        self.T_car4_to_vicon = np.eye(4)  # Vicon 到 car4 的变换矩阵
-        self.T_car5_to_vicon = np.eye(4)  # Vicon 到 car5 的变换矩阵
+        self.T_car1_to_vicon = np.eye(4)  # car1 到 Vicon 的变换矩阵
+        self.T_car2_to_vicon = np.eye(4)  # car2 到 Vicon 的变换矩阵
+        self.T_car3_to_vicon = np.eye(4)  # car3 到 Vicon 的变换矩阵
+        self.T_car4_to_vicon = np.eye(4)  # car4 到 Vicon 的变换矩阵
+        self.T_car5_to_vicon = np.eye(4)  # car5 到 Vicon 的变换矩阵
         # 相机参数配置
-        self.camera_matrix = np.array([ [436.04379372 ,  0.    ,     322.2056478 ],
-                                        [  0.    ,     408.81252158 , 231.98256365],
-                                        [  0.    ,       0.         ,  1.        ]])
+        self.camera_matrix = np.array([ [420 ,  0.  , 320 ],   # 370   200
+                                        [  0.,  420 , 240],
+                                        [  0.,  0. ,  1. ]])
         self.dist_coeffs = np.array( [[-0.09917725 , 0.1034774  , 0.00054878,  0.0001342 , -0.01694831]])
         # 多相机外参矩阵字典：{ (小车ID, 相机ID): 外参矩阵 }
         self.cam_extrinsics = {
@@ -104,7 +102,9 @@ class LightLocalizer():
     def car1_callback(self, msg):
         # vicon消息
         self.T_car1_to_vicon = get_homogenious(msg.transform.rotation, msg.transform.translation)
-        
+        # print('recieved car1 pose')
+        # print(self.T_car1_to_vicon)
+
     def car2_callback(self, msg):
         # vicon消息
         self.T_car2_to_vicon = get_homogenious(msg.transform.rotation, msg.transform.translation)
@@ -153,7 +153,7 @@ class LightLocalizer():
                 4: self.T_car4_to_vicon,
                 5: self.T_car5_to_vicon
             }[self_car_id]
-            
+            print(self.T_car1_to_vicon)
             # 获取当前相机的位姿参数
             T_cam_to_self_car = self.cam_extrinsics[(self_car_id, self_cam_id)]
             T_self_car_to_cam = np.linalg.inv(T_cam_to_self_car)
@@ -183,7 +183,7 @@ class LightLocalizer():
                     marker_proj = self.camera_matrix.dot(marker_pos)
                     marker_proj = marker_proj / marker_proj[2]
                     u, v = int(marker_proj[0]), int(marker_proj[1])
-                    
+                    print(u,v)
                     # 验证坐标有效性
                     if 0 <= u < 640 and 0 <= v < 480:  # 假设图像尺寸640x480
                         projections[target_car_id] = (u, v)
@@ -191,7 +191,7 @@ class LightLocalizer():
                         projections[target_car_id] = None
                 else:
                     projections[target_car_id] = None
-
+            print(projections)
         except KeyError:
             pass
         
