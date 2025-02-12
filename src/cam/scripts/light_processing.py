@@ -3,7 +3,7 @@ import numpy as np
 from geometry_msgs.msg import TransformStamped
 import rospy
 import tf
-
+from mv.msg import LightInfo
 
 # 外参矩阵
 M_cam2hand = [
@@ -98,6 +98,9 @@ class LightLocalizer():
         self.car3_sub = rospy.Subscriber("/vicon/IRSWARM3/IRSWARM3", TransformStamped, self.car3_callback)
         self.car4_sub = rospy.Subscriber("/vicon/IRSWARM4/IRSWARM4", TransformStamped, self.car4_callback)
         self.car5_sub = rospy.Subscriber("/vicon/IRSWARM5/IRSWARM5", TransformStamped, self.car5_callback)
+
+        self.k = 568.2587
+        self.b = 786.6579
 
     def car1_callback(self, msg):
         # vicon消息
@@ -250,3 +253,51 @@ class LightLocalizer():
         # 处理ROI区域
         centers, pixel_sums = self.process_roi(frame, roi_mask)
         return centers, pixel_sums
+    
+
+    def pixel_sum_to_distance(self, pixel_sum, exposure):
+        """基于光强衰减模型的距离估计"""
+        # 计算接收光强 (考虑相机响应模型)
+        # 根据平方反比定律计算距离
+        distance = np.sqrt((pixel_sum - self.b) * (exposure ** 2) / self.k )  
+        return distance
+    
+    def pixel_to_camera_coordinates(u, v, depth_value, camera_matrix, dist_coeffs):
+        """
+        将2D像素坐标转换为3D相机坐标系坐标
+        参数：
+            u, v : 像素坐标
+            depth_value : 对应像素点的深度值（单位：米）
+            camera_matrix : 相机内参矩阵 [[fx, 0, cx], [0, fy, cy], [0, 0, 1]]
+            dist_coeffs : 畸变系数 [k1, k2, p1, p2, k3]
+        返回：
+            (x, y, z) : 相机坐标系下的3D坐标
+        """
+        # 畸变校正（输入输出坐标格式为Nx1x2）
+        normalized_pt = cv2.undistortPoints(
+            np.array([[[u, v]]], dtype=np.float32),
+            cameraMatrix=camera_matrix,
+            distCoeffs=dist_coeffs
+        )
+
+        # 获取归一化坐标（无畸变）
+        x_normalized = normalized_pt[0][0][0]
+        y_normalized = normalized_pt[0][0][1]
+
+        # 深度反投影（假设深度值有效）
+        if depth_value > 0:
+            x = x_normalized * depth_value
+            y = y_normalized * depth_value
+            z = depth_value
+            return np.array([x, y, z])
+        else:
+            raise ValueError("Invalid depth value")
+
+    def reproject(self, pixel_loc, pixel_sum, exposure):
+        lights = []
+        for i, (u, v) in enumerate(pixel_loc):
+            distance = self.pixel_sum_to_distance(pixel_sum[i], exposure)
+            camera_coord = self.pixel_to_camera_coordinates(u, v, distance, self.camera_matrix, self.dist_coeffs)
+            lights.append(LightInfo(x=center_x, y=center_y, distance=distance))
+
+    

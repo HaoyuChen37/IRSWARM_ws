@@ -30,8 +30,6 @@ class Camera(object):
         self.shutter = [10000, 5000, 2500, 1250, 625, 312, 156, 78, 39, 19, 9, 5, 2, 1]
         self.fps = fps
         self.exposure = 312
-        self.k = 0
-        self.b = 0
         self.pixel_sum = []
         self.pixel_loc = []
         self.frame_ave_value = 0
@@ -112,7 +110,7 @@ class Camera(object):
         return frame
 
     def exposure_adjustment(self, low=1, high=100000):
-        target_pixel_value = 150
+        target_pixel_value = 220
 
         exposure_time = (low + high) // 2
         mvsdk.CameraSetExposureTime(self.hCamera, exposure_time)
@@ -160,11 +158,14 @@ class Camera(object):
         # 调用 process_frame 方法
         self.pixel_loc, self.pixel_sum = localizer.process_frame(frame, self.car_id, self.cam_id)
 
+        # reproject method
+
+
         # 根据处理结果发布消息
         lights = []
         for i, (center_x, center_y) in enumerate(self.pixel_loc):
             print(f"亮点中心坐标{i + 1}: ({center_x}, {center_y}); Pixel Sum: {self.pixel_sum[i]}")
-            lights.append(LightInfo(x=center_x, y=center_y, strength=self.pixel_sum[i]))
+            lights.append(LightInfo(x=center_x, y=center_y, distance=self.pixel_sum[i]))
 
         lights_info = Cam1(lights=lights)
         self.light_pub.publish(lights_info)
@@ -206,7 +207,7 @@ if __name__ == '__main__':
 
             cam.mask(frame, localizer)
 
-            # if np.max(frame) >= 200 or np.max(frame) <= 100:
+            # if np.max(frame) >= 250 or np.max(frame) <= 20:
             #     cam.exposure_adjustment()
 
             if cv2.waitKey(1) & 0xFF in [ord('q'), 27]:

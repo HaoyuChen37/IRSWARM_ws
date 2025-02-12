@@ -1,3 +1,3 @@
 float32 x
 float32 y
-float32 strength
+float32 distance
