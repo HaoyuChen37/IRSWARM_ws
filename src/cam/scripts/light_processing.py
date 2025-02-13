@@ -3,7 +3,8 @@ import numpy as np
 from geometry_msgs.msg import TransformStamped
 import rospy
 import tf
-from mv.msg import LightInfo
+from cam.msg import LightInfo
+import math as m
 
 # 外参矩阵
 M_cam2hand = [
@@ -53,6 +54,31 @@ M_cam2hand = [
         [0.01663465, -0.99984651,  0.00550034, -0.01089537],
         [0.,          0.,          0.,          1.        ]
     ])
+]
+
+
+# 相机到小车转换矩阵
+a = 1
+T_camera_to_car = [
+    np.array([[m.cos(m.pi/4), -m.sin(m.pi/4), 0,      a], # yaw = -pi/4
+             [m.sin(m.pi/4),   m.cos(m.pi/4), 0,     -a],
+             [0            ,   0            , 1,     0],
+             [0            ,   0            , 0,     1]]),
+
+    np.array([[m.cos(-m.pi/4), -m.sin(-m.pi/4), 0,    a], # yaw = pi/4
+             [m.sin(-m.pi/4),   m.cos(-m.pi/4), 0,    a],
+             [0             ,   0             , 1,    0],
+             [0             ,   0             , 0,    1]]),
+
+    np.array([[m.cos(-3*m.pi/4), -m.sin(-3*m.pi/4), 0,   -a], # yaw = 3pi/4
+             [m.sin(-3*m.pi/4),   m.cos(-3*m.pi/4), 0,    a],
+             [0               ,   0               , 1,    0],
+             [0               ,   0               , 0,    1]]),
+
+    np.array([[m.cos(3*m.pi/4), -m.sin(3*m.pi/4), 0,    -a], # yaw = -3pi/4
+             [m.sin(3*m.pi/4),   m.cos(3*m.pi/4), 0,    -a],
+             [0              ,   0              , 1,     0],
+             [0              ,   0              , 0,     1]]),
 ]
 
 
@@ -124,6 +150,16 @@ class LightLocalizer():
         # vicon消息
         self.T_car5_to_vicon = get_homogenious(msg.transform.rotation, msg.transform.translation)
 
+    def create_full_image_mask(self, img_shape):
+        """
+        创建一个覆盖整个图像的蒙版
+        :param img_shape: 图像的形状 (height, width)
+        :return: 覆盖整个图像的蒙版
+        """
+        # 创建一个与图像大小相同的全白蒙版
+        mask = np.ones(img_shape[:2], dtype=np.uint8) * 255
+        return mask
+    
     def create_roi_mask(self, projected_pt, img_shape):
         """根据投影点创建圆形ROI掩膜"""
         mask = np.zeros(img_shape[:2], dtype=np.uint8)
@@ -239,7 +275,7 @@ class LightLocalizer():
             
             return centers, pixel_sums
     
-    def process_frame(self, frame, car_id, cam_id):
+    def process_frame_with_vicon(self, frame, car_id, cam_id):
         """完整的定位流程"""
         # 获取投影点
         projected_pt = self.project_all_lights_to_image(car_id, cam_id)
@@ -254,15 +290,25 @@ class LightLocalizer():
         centers, pixel_sums = self.process_roi(frame, roi_mask)
         return centers, pixel_sums
     
+    def process_frame_without_vicon(self, frame):
+        """完整的定位流程"""
+        roi_mask = self.create_full_image_mask(frame.shape)
+
+        # 处理ROI区域
+        centers, pixel_sums = self.process_roi(frame, roi_mask)
+        return centers, pixel_sums
+    
 
     def pixel_sum_to_distance(self, pixel_sum, exposure):
         """基于光强衰减模型的距离估计"""
         # 计算接收光强 (考虑相机响应模型)
         # 根据平方反比定律计算距离
+        if pixel_sum - self.b < 0:
+             print("negative!!!")
         distance = np.sqrt((pixel_sum - self.b) * (exposure ** 2) / self.k )  
         return distance
     
-    def pixel_to_camera_coordinates(u, v, depth_value, camera_matrix, dist_coeffs):
+    def pixel_to_car_coordinates(self, u, v, distance, cam_id):
         """
         将2D像素坐标转换为3D相机坐标系坐标
         参数：
@@ -273,31 +319,38 @@ class LightLocalizer():
         返回：
             (x, y, z) : 相机坐标系下的3D坐标
         """
-        # 畸变校正（输入输出坐标格式为Nx1x2）
-        normalized_pt = cv2.undistortPoints(
-            np.array([[[u, v]]], dtype=np.float32),
-            cameraMatrix=camera_matrix,
-            distCoeffs=dist_coeffs
-        )
+        # 从像素坐标系转换到图像物理坐标系
+        p_pixel = np.array([u, v, 1])
+        P_inv = np.linalg.inv(self.camera_matrix)
+        p_image = P_inv.dot(p_pixel)
+        p_image = p_image / np.linalg.norm(p_image) * distance
 
-        # 获取归一化坐标（无畸变）
-        x_normalized = normalized_pt[0][0][0]
-        y_normalized = normalized_pt[0][0][1]
+        # 从图像物理坐标系转换到相机坐标系
+        R_i2c = np.array([[0, 0, 1],
+                          [1, 0, 0],
+                          [0, 1, 0]])
+        p_cam = R_i2c.dot(p_image)
 
-        # 深度反投影（假设深度值有效）
-        if depth_value > 0:
-            x = x_normalized * depth_value
-            y = y_normalized * depth_value
-            z = depth_value
-            return np.array([x, y, z])
-        else:
-            raise ValueError("Invalid depth value")
+        # 从相机坐标系转换到小车坐标系
+        p_cam = np.append(p_cam, 1)
+        p_car = T_camera_to_car[cam_id].dot(p_cam)
 
-    def reproject(self, pixel_loc, pixel_sum, exposure):
+        return p_car
+    
+    def reproject(self, pixel_loc, pixel_sum, exposure, cam_id):
         lights = []
         for i, (u, v) in enumerate(pixel_loc):
             distance = self.pixel_sum_to_distance(pixel_sum[i], exposure)
-            camera_coord = self.pixel_to_camera_coordinates(u, v, distance, self.camera_matrix, self.dist_coeffs)
-            lights.append(LightInfo(x=center_x, y=center_y, distance=distance))
+            p_car = self.pixel_to_car_coordinates(u, v, distance, cam_id)
+            lights.append(LightInfo(x=p_car[0], y=p_car[1], distance=distance))
+            print(f'x={p_car[0]}, y={p_car[1]}, distance={distance}')
+        return lights
 
-    
+def main():
+	lightlocalizer = LightLocalizer()
+	try:
+		lightlocalizer.pixel_to_car_coordinates(320, 240, 1, 0)
+	finally:
+		cv2.destroyAllWindows()
+
+# main()

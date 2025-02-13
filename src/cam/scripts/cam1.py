@@ -11,7 +11,7 @@ import mvsdk
 import platform
 from scipy.io import savemat
 from datetime import datetime
-from mv.msg import LightInfo, Cam1
+from cam.msg import LightInfo, Cam1
 from light_processing import LightLocalizer
 
 
@@ -154,18 +154,15 @@ class Camera(object):
         # 微调曝光时间
         self.exposure = best_exposure_time
 
-    def mask(self, frame, localizer):
-        # 调用 process_frame 方法
-        self.pixel_loc, self.pixel_sum = localizer.process_frame(frame, self.car_id, self.cam_id)
+    def mask(self, frame, localizer, with_vicon = 0):
+        if with_vicon == 0:
+            # 调用 process_frame_without_vicon 方法
+            self.pixel_loc, self.pixel_sum = localizer.process_frame_without_vicon(frame)
+        else:
+            self.pixel_loc, self.pixel_sum = localizer.process_frame_with_vicon(frame, self.car_id, self.cam_id)
 
         # reproject method
-
-
-        # 根据处理结果发布消息
-        lights = []
-        for i, (center_x, center_y) in enumerate(self.pixel_loc):
-            print(f"亮点中心坐标{i + 1}: ({center_x}, {center_y}); Pixel Sum: {self.pixel_sum[i]}")
-            lights.append(LightInfo(x=center_x, y=center_y, distance=self.pixel_sum[i]))
+        lights = localizer.reproject(self.pixel_loc, self.pixel_sum, self.exposure, self.cam_id)
 
         lights_info = Cam1(lights=lights)
         self.light_pub.publish(lights_info)
