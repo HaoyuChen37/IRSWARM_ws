@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import cv2
 import numpy as np
 from geometry_msgs.msg import TransformStamped
@@ -58,25 +59,25 @@ M_cam2hand = [
 
 
 # 相机到小车转换矩阵
-a = 1
+a = 0.04054 * m.sin(m.pi/4)
 T_camera_to_car = [
-    np.array([[m.cos(m.pi/4), -m.sin(m.pi/4), 0,      a], # yaw = -pi/4
-             [m.sin(m.pi/4),   m.cos(m.pi/4), 0,     -a],
+    np.array([[m.cos(m.pi/4),  m.sin(m.pi/4), 0,      a], # yaw = -pi/4
+             [-m.sin(m.pi/4),  m.cos(m.pi/4), 0,     -a],
              [0            ,   0            , 1,     0],
              [0            ,   0            , 0,     1]]),
 
-    np.array([[m.cos(-m.pi/4), -m.sin(-m.pi/4), 0,    a], # yaw = pi/4
-             [m.sin(-m.pi/4),   m.cos(-m.pi/4), 0,    a],
+    np.array([[m.cos(-m.pi/4),  m.sin(-m.pi/4), 0,    a], # yaw = pi/4
+             [-m.sin(-m.pi/4),  m.cos(-m.pi/4), 0,    a],
              [0             ,   0             , 1,    0],
              [0             ,   0             , 0,    1]]),
 
-    np.array([[m.cos(-3*m.pi/4), -m.sin(-3*m.pi/4), 0,   -a], # yaw = 3pi/4
-             [m.sin(-3*m.pi/4),   m.cos(-3*m.pi/4), 0,    a],
+    np.array([[m.cos(-3*m.pi/4), m.sin(-3*m.pi/4), 0,   -a], # yaw = 3pi/4
+             [-m.sin(-3*m.pi/4), m.cos(-3*m.pi/4), 0,    a],
              [0               ,   0               , 1,    0],
              [0               ,   0               , 0,    1]]),
 
     np.array([[m.cos(3*m.pi/4), -m.sin(3*m.pi/4), 0,    -a], # yaw = -3pi/4
-             [m.sin(3*m.pi/4),   m.cos(3*m.pi/4), 0,    -a],
+             [-m.sin(3*m.pi/4),  m.cos(3*m.pi/4), 0,    -a],
              [0              ,   0              , 1,     0],
              [0              ,   0              , 0,     1]]),
 ]
@@ -334,6 +335,7 @@ class LightLocalizer():
         # 从相机坐标系转换到小车坐标系
         p_cam = np.append(p_cam, 1)
         p_car = T_camera_to_car[cam_id].dot(p_cam)
+        print(p_car)
 
         return p_car
     
@@ -349,7 +351,7 @@ class LightLocalizer():
 def main():
 	lightlocalizer = LightLocalizer()
 	try:
-		lightlocalizer.pixel_to_car_coordinates(320, 240, 1, 0)
+		lightlocalizer.pixel_to_car_coordinates(320, 240, m.sqrt(2), 0)
 	finally:
 		cv2.destroyAllWindows()
 
