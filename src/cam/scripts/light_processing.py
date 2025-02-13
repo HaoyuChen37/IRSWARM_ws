@@ -306,7 +306,7 @@ class LightLocalizer():
         # 根据平方反比定律计算距离
         if pixel_sum - self.b < 0:
              print("negative!!!")
-        distance = np.sqrt((pixel_sum - self.b) * ((exposure/774) ** 2) / self.k )  
+        distance = np.sqrt(self.k / ((pixel_sum / (exposure/774) ) - self.b) )  
         return distance
     
     def pixel_to_car_coordinates(self, u, v, distance, cam_id):
