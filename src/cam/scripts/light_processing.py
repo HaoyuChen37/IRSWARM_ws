@@ -95,6 +95,9 @@ def get_homogenious(quaternion, position):
         T[3, 3] = 1
         return T
 
+def record_distance(pose1, pose2):
+    dis = ((pose1[0]-pose2[0])**2 + (pose1[1]-pose2[1])**2 + (pose1[2]-pose2[2])**2) **0.5
+    return dis
 
 class LightLocalizer():
     def __init__(self):
@@ -128,6 +131,22 @@ class LightLocalizer():
 
         self.k = 568.2587
         self.b = 786.6579
+
+        # 初始化字典，每个键对应一个空列表
+        self.true_data = {
+            'time': [],
+            'car1_pose': [],
+            'car2_pose': [],
+            'car3_pose': [],
+            'car4_pose': [],
+            'car5_pose': [],
+            'true_dis':[],
+            'calculated_dis': [],
+            'calculated_loc': [],
+            'pixel_sum': [],
+            'pixel_loc': [],
+            'cam_exp': []
+        }
 
     def car1_callback(self, msg):
         # vicon消息
@@ -339,14 +358,37 @@ class LightLocalizer():
 
         return p_car
     
-    def reproject(self, pixel_loc, pixel_sum, exposure, cam_id):
+    def reproject(self, pixel_loc, pixel_sum, exposure, cam_id, savedata):
         lights = []
+        loc = []
+        dis = []
         for i, (u, v) in enumerate(pixel_loc):
             distance = self.pixel_sum_to_distance(pixel_sum[i], exposure)
             p_car = self.pixel_to_car_coordinates(u, v, distance, cam_id)
             lights.append(LightInfo(x=p_car[0], y=p_car[1], distance=distance))
             print(f'x={p_car[0]}, y={p_car[1]}, distance={distance}')
+            loc.append([p_car[0], p_car[1]])
+            dis.append(distance)
+
+        if savedata:
+            self.savedata(pixel_loc, pixel_sum, exposure, loc, dis)
         return lights
+    
+    def savedata(self, pixel_loc, pixel_sum, exposure, location, calculated_dis):
+        t = int(str(rospy.Time.now().to_nsec()))
+        self.true_data['time'].append(t)
+        self.true_data['car1_pose'].append(self.T_car1_to_vicon)
+        self.true_data['car2_pose'].append(self.T_car2_to_vicon)
+        self.true_data['car3_pose'].append(self.T_car2_to_vicon)
+        self.true_data['car4_pose'].append(self.T_car2_to_vicon)
+        self.true_data['car5_pose'].append(self.T_car2_to_vicon)
+        # self.true_data['true_dis'] .append(record_distance(self.T_car1_to_vicon[0:3, 3], self.T_car2_to_vicon[0:3, 3]))
+        self.true_data['calculated_dis'].append(calculated_dis)
+        self.true_data['calculated_loc'].append(location)
+        self.true_data['pixel_sum'].append(pixel_sum)
+        self.true_data['pixel_loc'].append(pixel_loc)
+        self.true_data['cam_exp'].append(exposure)
+        
 
 def main():
 	lightlocalizer = LightLocalizer()

@@ -154,7 +154,7 @@ class Camera(object):
         # 微调曝光时间
         self.exposure = best_exposure_time
 
-    def mask(self, frame, localizer, with_vicon = 0):
+    def mask(self, frame, localizer, with_vicon = 0, savedata = False):
         if with_vicon == 0:
             # 调用 process_frame_without_vicon 方法
             self.pixel_loc, self.pixel_sum = localizer.process_frame_without_vicon(frame)
@@ -162,7 +162,7 @@ class Camera(object):
             self.pixel_loc, self.pixel_sum = localizer.process_frame_with_vicon(frame, self.car_id, self.cam_id)
 
         # reproject method
-        lights = localizer.reproject(self.pixel_loc, self.pixel_sum, self.exposure, self.cam_id)
+        lights = localizer.reproject(self.pixel_loc, self.pixel_sum, self.exposure, self.cam_id, savedata)
 
         lights_info = Cam1(lights=lights)
         self.light_pub.publish(lights_info)
@@ -180,7 +180,8 @@ if __name__ == '__main__':
     cam = Camera()
     # folder_name = input('input the folder name:')
     folder_name = '2'
-    image_dir = f"Data/{folder_name}/cam1/"
+    image_dir = f"Data/{folder_name}/Cam1/"
+    pose_dir = f"Data/{folder_name}/data.mat"
     if not os.path.exists(image_dir):
         # 在Linux中创建目录
         os.makedirs(image_dir)
@@ -195,6 +196,7 @@ if __name__ == '__main__':
             try:
                 current_time = datetime.now().strftime('%m%d%H%M%S%f')
                 frame = cam.get_frame()
+                # cv2.imshow('frame', frame)
                 cv2.imwrite(image_dir + current_time + ".png", frame)
                 if frame is None:
                     continue
@@ -202,7 +204,7 @@ if __name__ == '__main__':
                 if e.error_code != mvsdk.CAMERA_STATUS_TIME_OUT:
                     print("CameraGetImageBuffer failed({}): {}".format(e.error_code, e.message))
 
-            cam.mask(frame, localizer)
+            cam.mask(frame, localizer, savedata = True)
 
             # if np.max(frame) >= 250 or np.max(frame) <= 20:
             #     cam.exposure_adjustment()
@@ -217,3 +219,7 @@ if __name__ == '__main__':
     finally:
         cam.release()
         print('camera1 has closed')
+        for key, value in localizer.true_data.items():
+            localizer.true_data[key] = np.array(value)
+        savemat(pose_dir, localizer.true_data)
+        print('save file successfully')
