@@ -129,8 +129,8 @@ class LightLocalizer():
         self.car4_sub = rospy.Subscriber("/vicon/IRSWARM4/IRSWARM4", TransformStamped, self.car4_callback)
         self.car5_sub = rospy.Subscriber("/vicon/IRSWARM5/IRSWARM5", TransformStamped, self.car5_callback)
 
-        self.k = 568.2587
-        self.b = 786.6579
+        self.k = 1487.3
+        self.b = 1191.2
 
         # 初始化字典，每个键对应一个空列表
         self.true_data = {
