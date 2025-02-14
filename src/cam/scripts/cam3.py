@@ -11,17 +11,17 @@ import mvsdk
 import platform
 from scipy.io import savemat
 from datetime import datetime
-from cam.msg import LightInfo, Cam1
+from cam.msg import LightInfo, Cam3
 from light_processing import LightLocalizer
 
 
 class Camera(object):
     def __init__(self, width=1280, height=720, fps=100):
-        rospy.init_node('Cam1_node', anonymous=True)
+        rospy.init_node('Cam3_node', anonymous=True)
         self.width = width
         self.height = height
         self.bridge = CvBridge()
-        self.light_pub = rospy.Publisher('/Cam1', Cam1, queue_size=100)
+        self.light_pub = rospy.Publisher('/Cam3', Cam3, queue_size=100)
         # initialize camera parameters
         self.DevList = []
         self.hCamera = 0
@@ -36,7 +36,7 @@ class Camera(object):
         self.frame_max_value = 0
         # Initialize car_id, cam_id
         self.car_id = 1
-        self.cam_id = 0
+        self.cam_id = 3
         
     def initialization(self):
         # 枚举相机
@@ -164,7 +164,7 @@ class Camera(object):
         # reproject method
         lights = localizer.reproject(self.pixel_loc, self.pixel_sum, self.exposure, self.cam_id, savedata)
 
-        lights_info = Cam1(lights=lights)
+        lights_info = Cam3(lights=lights)
         self.light_pub.publish(lights_info)
 
     def release(self):
@@ -180,8 +180,8 @@ if __name__ == '__main__':
     cam = Camera()
     # folder_name = input('input the folder name:')
     folder_name = '2'
-    image_dir = f"Data/{folder_name}/Cam1/"
-    pose_dir = f"Data/{folder_name}/Cam1/data.mat"
+    image_dir = f"Data/{folder_name}/Cam3/"
+    pose_dir = f"Data/{folder_name}/Cam3/data.mat"
     if not os.path.exists(image_dir):
         # 在Linux中创建目录
         os.makedirs(image_dir)
