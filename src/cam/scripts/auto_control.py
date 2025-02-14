@@ -1,66 +1,86 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 import rospy
-from mv.msg import Cam1, Cam2, Cam3, Cam4
-from geometry_msgs.msg import Twist  # 导入Twist消息类型用于速度控制
+from cam.msg import Cam1, Cam2, Cam3, Cam4
+from geometry_msgs.msg import Twist
 
-# 定义一个全局字典来存储消息数据
-lights_data = {}
-vel = (0, 0)
+# 定义全局变量
+lights_data = {'Cam1': [], 'Cam2': [], 'Cam3': [], 'Cam4': []}  # 存储四个相机的数据
+MAX_SPEED = 0.5  # 最大速度限制
+MIN_DISTANCE = 0.5  # 最小安全距离
+CAMERA_COUNT = 4  # 相机数量
 
-def callback(data):
-    rospy.loginfo("Received LightsInfo:")
-    global lights_data
-    global vel
-    vel = (0, 0)
-    dis = 1
-    p = 1
-    # 初始化一个列表来存储每个LightInfo的字典
+# 回调函数：处理相机数据
+def callback(data, cam_id):
+    rospy.loginfo(f"Received data from {cam_id}:")
     lights_list = []
-    
+
     for light in data.lights:
-        # 将每个LightInfo转换为字典
         light_dict = {
-            'id': light.id,
             'x': light.x,
             'y': light.y,
             'distance': light.distance
         }
         lights_list.append(light_dict)
-        # 计算速度
-        vel = (vel[0] + p * light.x * (light.distance - dis), vel[1] + p * light.y * (light.distance - dis))
-    
-    # 将列表保存到全局字典中
-    lights_data['lights'] = lights_list
-    
-    # 打印字典内容（可选）
-    rospy.loginfo(lights_data)
-    
-    # 发布速度指令
-    publish_velocity(vel)
 
+    lights_data[cam_id] = lights_list
+    rospy.loginfo(f"Updated lights_data for {cam_id}: {lights_data[cam_id]}")
+
+    
+    calculate_and_publish_velocity()
+
+# 计算速度
+def calculate_velocity():
+    global lights_data
+    vel = (0, 0)
+    p = 1.0  # 比例系数
+    dis = 1.0  # 目标距离
+
+    for cam_id, lights in lights_data.items():
+        for light in lights:
+            distance = light['distance']
+            if distance < MIN_DISTANCE:
+                rospy.logwarn(f"Target too close in {cam_id}! Distance: {distance}")
+                continue
+
+            # 调整速度计算公式
+            vel = (
+                vel[0] - p * light['x'] * (distance - dis),  # 注意负号
+                vel[1] - p * light['y'] * (distance - dis)
+            )
+
+    # 限制速度
+    speed = (vel[0]**2 + vel[1]**2)**0.5
+    if speed > MAX_SPEED:
+        vel = (vel[0] / speed * MAX_SPEED, vel[1] / speed * MAX_SPEED)
+
+    return vel
+
+# 发布速度指令
 def publish_velocity(velocity):
-    # 创建速度消息
     velocity_msg = Twist()
     velocity_msg.linear.x = velocity[0]
     velocity_msg.linear.y = velocity[1]
-    
-    # 发布速度消息到/robot/velcmd
     velocity_publisher.publish(velocity_msg)
-    rospy.loginfo("Published velocity command: Linear x={}, y={}".format(velocity[0], velocity[1]))
+    rospy.loginfo(f"Published velocity command: Linear x={velocity[0]}, y={velocity[1]}")
 
+# 计算并发布速度
+def calculate_and_publish_velocity():
+    vel = calculate_velocity()
+    publish_velocity(vel)
+
+# 初始化订阅者和发布者
 def lights_info_subscriber():
-    global velocity_publisher  # 声明为全局变量以便在callback函数中使用
-    # 初始化ROS节点
+    global velocity_publisher
     rospy.init_node('lights_info_subscriber', anonymous=True)
-    
-    # 创建一个发布者，发布到/robot/velcmd
     velocity_publisher = rospy.Publisher('/robot/velcmd', Twist, queue_size=10)
-    
-    # 创建一个订阅者，订阅名为'lights_info'的主题
-    rospy.Subscriber('lights_info', LightsInfo, callback)
-    
-    # 保持节点运行，直到被中断
+
+    # 订阅四个相机的数据
+    rospy.Subscriber('/Cam1', Cam1, lambda data: callback(data, 'Cam1'))
+    rospy.Subscriber('/Cam2', Cam2, lambda data: callback(data, 'Cam2'))
+    rospy.Subscriber('/Cam3', Cam3, lambda data: callback(data, 'Cam3'))
+    rospy.Subscriber('/Cam4', Cam4, lambda data: callback(data, 'Cam4'))
+
     rospy.spin()
 
 if __name__ == '__main__':
