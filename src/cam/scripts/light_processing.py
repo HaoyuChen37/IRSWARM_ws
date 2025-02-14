@@ -151,8 +151,9 @@ class LightLocalizer():
     def car1_callback(self, msg):
         # vicon消息
         self.T_car1_to_vicon = get_homogenious(msg.transform.rotation, msg.transform.translation)
+        self.dis1_2 = record_distance(self.T_car1_to_vicon[0:3, 3], self.T_car2_to_vicon[0:3, 3])
         # print('recieved car1 pose')
-        # print(self.T_car1_to_vicon)
+        print(self.dis1_2)
 
     def car2_callback(self, msg):
         # vicon消息
@@ -382,7 +383,7 @@ class LightLocalizer():
         self.true_data['car3_pose'].append(self.T_car2_to_vicon)
         self.true_data['car4_pose'].append(self.T_car2_to_vicon)
         self.true_data['car5_pose'].append(self.T_car2_to_vicon)
-        # self.true_data['true_dis'] .append(record_distance(self.T_car1_to_vicon[0:3, 3], self.T_car2_to_vicon[0:3, 3]))
+        self.true_data['true_dis'] .append(self.dis1_2)
         self.true_data['calculated_dis'].append(calculated_dis)
         self.true_data['calculated_loc'].append(location)
         self.true_data['pixel_sum'].append(pixel_sum)
