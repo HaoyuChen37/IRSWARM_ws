@@ -29,7 +29,7 @@ class Camera(object):
         self.pFrameBuffer = None
         self.shutter = [10000, 5000, 2500, 1250, 625, 312, 156, 78, 39, 19, 9, 5, 2, 1]
         self.fps = fps
-        self.exposure = 312
+        self.exposure = 732
         self.pixel_sum = []
         self.pixel_loc = []
         self.frame_ave_value = 0
@@ -89,7 +89,8 @@ class Camera(object):
         self.pFrameBuffer = mvsdk.CameraAlignMalloc(self.FrameBufferSize, 16)
 
         # initialize exposure time
-        self.exposure_adjustment()
+        # self.exposure_adjustment()
+        mvsdk.CameraSetExposureTime(self.hCamera, self.exposure)
         # mvsdk.CameraSetExposureTime(self.hCamera, self.exposure)
 
     def get_frame(self):
@@ -110,7 +111,7 @@ class Camera(object):
         return frame
 
     def exposure_adjustment(self, low=1, high=100000):
-        target_pixel_value = 220
+        target_pixel_value = 250
 
         exposure_time = (low + high) // 2
         mvsdk.CameraSetExposureTime(self.hCamera, exposure_time)

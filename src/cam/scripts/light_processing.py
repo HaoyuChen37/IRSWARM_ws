@@ -132,6 +132,8 @@ class LightLocalizer():
         self.k = 1487.3
         self.b = 1191.2
 
+        self.dis1_2 = 0
+
         # 初始化字典，每个键对应一个空列表
         self.true_data = {
             'time': [],
@@ -153,7 +155,7 @@ class LightLocalizer():
         self.T_car1_to_vicon = get_homogenious(msg.transform.rotation, msg.transform.translation)
         self.dis1_2 = record_distance(self.T_car1_to_vicon[0:3, 3], self.T_car2_to_vicon[0:3, 3])
         # print('recieved car1 pose')
-        print(self.dis1_2)
+        
 
     def car2_callback(self, msg):
         # vicon消息
@@ -213,7 +215,7 @@ class LightLocalizer():
                 4: self.T_car4_to_vicon,
                 5: self.T_car5_to_vicon
             }[self_car_id]
-            print(self.T_car1_to_vicon)
+            # print(self.T_car1_to_vicon)
             # 获取当前相机的位姿参数
             T_cam_to_self_car = self.cam_extrinsics[(self_car_id, self_cam_id)]
             T_self_car_to_cam = np.linalg.inv(T_cam_to_self_car)
@@ -243,7 +245,7 @@ class LightLocalizer():
                     marker_proj = self.camera_matrix.dot(marker_pos)
                     marker_proj = marker_proj / marker_proj[2]
                     u, v = int(marker_proj[0]), int(marker_proj[1])
-                    print(u,v)
+                    # print(u,v)
                     # 验证坐标有效性
                     if 0 <= u < 640 and 0 <= v < 480:  # 假设图像尺寸640x480
                         projections[target_car_id] = (u, v)
@@ -251,7 +253,7 @@ class LightLocalizer():
                         projections[target_car_id] = None
                 else:
                     projections[target_car_id] = None
-            print(projections)
+            # print(projections)
         except KeyError:
             pass
         
@@ -326,7 +328,7 @@ class LightLocalizer():
         # 根据平方反比定律计算距离
         if pixel_sum - self.b < 0:
              print("negative!!!")
-        distance = np.sqrt(self.k / ((pixel_sum / (exposure/774) ) - self.b) )  
+        distance = np.sqrt(self.k / ((pixel_sum / (exposure/732) ) - self.b) )  
         return distance
     
     def pixel_to_car_coordinates(self, u, v, distance, cam_id):
@@ -355,7 +357,6 @@ class LightLocalizer():
         # 从相机坐标系转换到小车坐标系
         p_cam = np.append(p_cam, 1)
         p_car = T_camera_to_car[cam_id].dot(p_cam)
-        print(p_car)
 
         return p_car
     
@@ -368,6 +369,7 @@ class LightLocalizer():
             p_car = self.pixel_to_car_coordinates(u, v, distance, cam_id)
             lights.append(LightInfo(x=p_car[0], y=p_car[1], distance=distance))
             print(f'x={p_car[0]}, y={p_car[1]}, distance={distance}')
+            print(self.dis1_2)
             loc.append([p_car[0], p_car[1]])
             dis.append(distance)
 

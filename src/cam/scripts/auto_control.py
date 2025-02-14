@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 import rospy
-from mv.msg import Cam1, Cam2, Cam3, Cam4
+from cam.msg import Cam1, Cam2, Cam3, Cam4
 from geometry_msgs.msg import Twist  # 导入Twist消息类型用于速度控制
 
 # 定义一个全局字典来存储消息数据
@@ -21,7 +21,6 @@ def callback(data):
     for light in data.lights:
         # 将每个LightInfo转换为字典
         light_dict = {
-            'id': light.id,
             'x': light.x,
             'y': light.y,
             'distance': light.distance
@@ -58,7 +57,7 @@ def lights_info_subscriber():
     velocity_publisher = rospy.Publisher('/robot/velcmd', Twist, queue_size=10)
     
     # 创建一个订阅者，订阅名为'lights_info'的主题
-    rospy.Subscriber('lights_info', LightsInfo, callback)
+    rospy.Subscriber('/Cam1', Cam1, callback)
     
     # 保持节点运行，直到被中断
     rospy.spin()
