@@ -1,4 +1,9 @@
 # multi-light-detecting system
+git pull origin main
+```bash
+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
+```
+
 ## 下载ros
 ```bash
 wget http://fishros.com/install -O fishros && . fishros
