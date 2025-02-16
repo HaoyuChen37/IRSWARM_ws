@@ -223,4 +223,4 @@ if __name__ == '__main__':
         for key, value in localizer.true_data.items():
             localizer.true_data[key] = np.array(value)
         savemat(pose_dir, localizer.true_data)
-        print('save file successfully')
+        print('save file1 successfully')

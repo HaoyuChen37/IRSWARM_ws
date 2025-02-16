@@ -3,6 +3,14 @@
 import rospy
 from cam.msg import Cam1, Cam2, Cam3, Cam4
 from geometry_msgs.msg import Twist  # 导入Twist消息类型用于速度控制
+import logging
+
+rospy.init_node('lights_info_subscriber', anonymous=True)
+
+# 设置日志文件路径
+log_file_path = "Data/logfile.log"
+logging.basicConfig(filename=log_file_path, level=logging.INFO)
+
 
 # 定义全局变量
 lights_data = {'Cam1': [], 'Cam2': [], 'Cam3': [], 'Cam4': []}  # 存储四个相机的数据

@@ -50,7 +50,7 @@ class Camera(object):
         for i, DevInfo in enumerate(self.DevList):
             print("{}: {} {}".format(i, DevInfo.GetFriendlyName(), DevInfo.GetPortType()))
         # n-th camera
-        i = 0
+        i = 3
         DevInfo = self.DevList[i]
         print(DevInfo)
 
@@ -218,8 +218,8 @@ if __name__ == '__main__':
         pass
     finally:
         cam.release()
-        print('camera1 has closed')
+        print('camera4 has closed')
         for key, value in localizer.true_data.items():
             localizer.true_data[key] = np.array(value)
         savemat(pose_dir, localizer.true_data)
-        print('save file successfully')
+        print('save file4 successfully')
