@@ -179,7 +179,7 @@ class Camera(object):
 if __name__ == '__main__':
     cam = Camera()
     # folder_name = input('input the folder name:')
-    folder_name = '2'
+    folder_name = datetime.now().strftime('%m%d%H%M%S%f')
     image_dir = f"Data/{folder_name}/Cam3/"
     pose_dir = f"Data/{folder_name}/Cam3/data.mat"
     if not os.path.exists(image_dir):
