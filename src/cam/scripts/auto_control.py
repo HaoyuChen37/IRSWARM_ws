@@ -20,7 +20,7 @@ CAMERA_COUNT = 4  # 相机数量
 
 # 回调函数：处理相机数据
 def callback(data, cam_id):
-    rospy.loginfo(f"Received data from {cam_id}:")
+    # rospy.loginfo(f"Received data from {cam_id}:")
     lights_list = []
 
     for light in data.lights:
@@ -32,9 +32,9 @@ def callback(data, cam_id):
         lights_list.append(light_dict)
 
     lights_data[cam_id] = lights_list
-    rospy.loginfo(f"Updated lights_data for {cam_id}: {lights_data[cam_id]}")
+    # rospy.loginfo(f"Updated lights_data for {cam_id}: {lights_data[cam_id]}")
 
-    
+    # 每次接收到相机数据后计算并发布速度
     calculate_and_publish_velocity()
 
 # 计算速度
@@ -53,8 +53,8 @@ def calculate_velocity():
 
             # 调整速度计算公式
             vel = (
-                vel[0] - p * light['x'] * (distance - dis),  # 注意负号
-                vel[1] - p * light['y'] * (distance - dis)
+                vel[0] + p * light['x'] * (distance - dis),  # 注意负号
+                vel[1] + p * light['y'] * (distance - dis)
             )
 
     # 限制速度
@@ -70,7 +70,7 @@ def publish_velocity(velocity):
     velocity_msg.linear.x = velocity[0]
     velocity_msg.linear.y = velocity[1]
     velocity_publisher.publish(velocity_msg)
-    rospy.loginfo(f"Published velocity command: Linear x={velocity[0]}, y={velocity[1]}")
+    # rospy.loginfo(f"Published velocity command: Linear x={velocity[0]}, y={velocity[1]}")
 
 # 计算并发布速度
 def calculate_and_publish_velocity():
@@ -94,5 +94,6 @@ def lights_info_subscriber():
 if __name__ == '__main__':
     try:
         lights_info_subscriber()
+        # calculate_and_publish_velocity()
     except rospy.ROSInterruptException:
         pass
