@@ -13,10 +13,13 @@ from scipy.io import savemat
 from datetime import datetime
 from cam.msg import LightInfo, Cam1
 from light_processing import LightLocalizer
+import pdb
 
+
+Cam_ID = 17
 
 class Camera(object):
-    def __init__(self, width=1280, height=720, fps=100):
+    def __init__(self, Cam_ID, width=1280, height=720, fps=100):
         rospy.init_node('Cam1_node', anonymous=True)
         self.width = width
         self.height = height
@@ -35,8 +38,9 @@ class Camera(object):
         self.frame_ave_value = 0
         self.frame_max_value = 0
         # Initialize car_id, cam_id
-        self.car_id = 1
-        self.cam_id = 0
+        self.friendly_name = str(Cam_ID)
+        self.car_id = Cam_ID // 4
+        self.cam_id = Cam_ID % 4 - 1
         
     def initialization(self):
         # 枚举相机
@@ -47,12 +51,17 @@ class Camera(object):
             print("No camera was found!")
             return
 
+        # 打印所有相机设备信息
         for i, DevInfo in enumerate(self.DevList):
             print("{}: {} {}".format(i, DevInfo.GetFriendlyName(), DevInfo.GetPortType()))
-        # n-th camera
-        i = 0
-        DevInfo = self.DevList[i]
-        print(DevInfo)
+
+        # 根据 FriendlyName 查找目标相机
+        target_camera_info = None
+        for DevInfo in self.DevList:
+            print(DevInfo.GetFriendlyName() == self.friendly_name)
+            if DevInfo.GetFriendlyName() == self.friendly_name:
+                target_camera_info = DevInfo
+                break
 
         # 打开相机
         self.hCamera = 0
@@ -178,7 +187,7 @@ class Camera(object):
 
 
 if __name__ == '__main__':
-    cam = Camera()
+    cam = Camera(Cam_ID)
     # folder_name = input('input the folder name:')
     folder_name = datetime.now().strftime('%m%d%H%M%S%f')
     image_dir = f"Data/{folder_name}/Cam1/"

@@ -114,10 +114,10 @@ class LightLocalizer():
         self.dist_coeffs = np.array( [[-0.09917725 , 0.1034774  , 0.00054878,  0.0001342 , -0.01694831]])
         # 多相机外参矩阵字典：{ (小车ID, 相机ID): 外参矩阵 }
         self.cam_extrinsics = {
-            (1, 0): M_cam2hand[0],
-            (1, 1): M_cam2hand[1],
-            (1, 2): M_cam2hand[2],
-            (1, 3): M_cam2hand[3],
+            (0, 0): M_cam2hand[0],
+            (0, 1): M_cam2hand[1],
+            (0, 2): M_cam2hand[2],
+            (0, 3): M_cam2hand[3],
             # 添加其他小车和相机组合...
         }
         # 添加ROI半径参数
@@ -209,11 +209,11 @@ class LightLocalizer():
         try:
             # 获取当前小车的VICON位姿 (T_self_car_to_vicon)
             T_self_car_to_vicon = {
-                1: self.T_car1_to_vicon,
-                2: self.T_car2_to_vicon,
-                3: self.T_car3_to_vicon,
-                4: self.T_car4_to_vicon,
-                5: self.T_car5_to_vicon
+                0: self.T_car1_to_vicon,
+                1: self.T_car2_to_vicon,
+                2: self.T_car3_to_vicon,
+                3: self.T_car4_to_vicon,
+                4: self.T_car5_to_vicon
             }[self_car_id]
             # print(self.T_car1_to_vicon)
             # 获取当前相机的位姿参数
@@ -230,11 +230,11 @@ class LightLocalizer():
                     
                 # 获取目标小车的VICON位姿 (T_target_car_to_vicon)
                 T_target_car_to_vicon = {
-                    1: self.T_car1_to_vicon,
-                    2: self.T_car2_to_vicon,
-                    3: self.T_car3_to_vicon,
-                    4: self.T_car4_to_vicon,
-                    5: self.T_car5_to_vicon
+                    0: self.T_car1_to_vicon,
+                    1: self.T_car2_to_vicon,
+                    2: self.T_car3_to_vicon,
+                    3: self.T_car4_to_vicon,
+                    4: self.T_car5_to_vicon
                 }[target_car_id]
                 
                 pose = T_target_car_to_vicon[:3, 3]
