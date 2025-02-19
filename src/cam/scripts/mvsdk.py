@@ -1043,25 +1043,6 @@ def CameraGetAnalogGain(hCamera):
 	err_code = _sdk.CameraGetAnalogGain(hCamera, byref(piAnalogGain))
 	SetLastError(err_code)
 	return piAnalogGain.value
-	
-def CameraSetAnalogGainX(hCamera, fGain):
-	err_code = _sdk.CameraSetAnalogGainX(hCamera, c_float(fGain) )
-	SetLastError(err_code)
-	return err_code
-
-def CameraGetAnalogGainX(hCamera):
-	fGain = c_float()
-	err_code = _sdk.CameraGetAnalogGainX(hCamera, byref(fGain))
-	SetLastError(err_code)
-	return fGain.value
-
-def CameraGetAnalogGainXRange(hCamera):
-	pfMin = c_float()
-	pfMax = c_float()
-	pfStep = c_float()
-	err_code = _sdk.CameraGetAnalogGainXRange(hCamera, byref(pfMin), byref(pfMax), byref(pfStep))
-	SetLastError(err_code)
-	return (pfMin.value, pfMax.value, pfStep.value)
 
 def CameraSetGain(hCamera, iRGain, iGGain, iBGain):
 	err_code = _sdk.CameraSetGain(hCamera, iRGain, iGGain, iBGain)
