@@ -15,7 +15,7 @@ from cam.msg import LightInfo, Cam3
 from light_processing import LightLocalizer
 
 
-Cam_ID = 17
+Cam_ID = 19
 
 class Camera(object):
     def __init__(self, Cam_ID, width=1280, height=720, fps=100):
@@ -57,7 +57,6 @@ class Camera(object):
         # 根据 FriendlyName 查找目标相机
         target_camera_info = None
         for DevInfo in self.DevList:
-            print(DevInfo.GetFriendlyName() == self.friendly_name)
             if DevInfo.GetFriendlyName() == self.friendly_name:
                 target_camera_info = DevInfo
                 break
@@ -66,7 +65,7 @@ class Camera(object):
         # 打开相机
         self.hCamera = 0
         try:
-            self.hCamera = mvsdk.CameraInit(DevInfo, -1, -1)
+            self.hCamera = mvsdk.CameraInit(target_camera_info, -1, -1)
         except mvsdk.CameraException as e:
             print("CameraInit Failed({}): {}".format(e.error_code, e.message))
             return
@@ -103,21 +102,25 @@ class Camera(object):
         # mvsdk.CameraSetExposureTime(self.hCamera, self.exposure)
 
     def get_frame(self):
-        pRawData, FrameHead = mvsdk.CameraGetImageBuffer(self.hCamera, 200)
-        mvsdk.CameraImageProcess(self.hCamera, pRawData, self.pFrameBuffer, FrameHead)
-        mvsdk.CameraReleaseImageBuffer(self.hCamera, pRawData)
+        try:
+            pRawData, FrameHead = mvsdk.CameraGetImageBuffer(self.hCamera, 200)
+            mvsdk.CameraImageProcess(self.hCamera, pRawData, self.pFrameBuffer, FrameHead)
+            mvsdk.CameraReleaseImageBuffer(self.hCamera, pRawData)
 
-        # 此时图片已经存储在pFrameBuffer中，对于彩色相机pFrameBuffer=RGB数据，黑白相机pFrameBuffer=8位灰度数据
-        # 把pFrameBuffer转换成opencv的图像格式以进行后续算法处理
-        frame_data = (mvsdk.c_ubyte * FrameHead.uBytes).from_address(self.pFrameBuffer)
-        frame = np.frombuffer(frame_data, dtype=np.uint8)
-        frame = frame.reshape(
-            (FrameHead.iHeight, FrameHead.iWidth, 1 if FrameHead.uiMediaType == mvsdk.CAMERA_MEDIA_TYPE_MONO8 else 3))
+            # 此时图片已经存储在pFrameBuffer中，对于彩色相机pFrameBuffer=RGB数据，黑白相机pFrameBuffer=8位灰度数据
+            # 把pFrameBuffer转换成opencv的图像格式以进行后续算法处理
+            frame_data = (mvsdk.c_ubyte * FrameHead.uBytes).from_address(self.pFrameBuffer)
+            frame = np.frombuffer(frame_data, dtype=np.uint8)
+            frame = frame.reshape(
+                (FrameHead.iHeight, FrameHead.iWidth, 1 if FrameHead.uiMediaType == mvsdk.CAMERA_MEDIA_TYPE_MONO8 else 3))
 
-        frame = cv2.resize(frame, (640, 480), interpolation=cv2.INTER_LINEAR)
-        # cv2.imshow("Press q to end", frame)
-
-        return frame
+            frame = cv2.resize(frame, (640, 480), interpolation=cv2.INTER_LINEAR)
+            # cv2.imshow("Press q to end", frame)
+            # print(frame)
+            return frame
+        except mvsdk.CameraException as e:
+            if e.error_code != mvsdk.CAMERA_STATUS_TIME_OUT:
+                print("CameraGetImageBuffer failed({}): {}".format(e.error_code, e.message))
 
     def exposure_adjustment(self, low=1, high=100000):
         target_pixel_value = 220
@@ -187,7 +190,7 @@ class Camera(object):
 
 
 if __name__ == '__main__':
-    cam = Camera()
+    cam = Camera(Cam_ID)
     # folder_name = input('input the folder name:')
     folder_name = datetime.now().strftime('%m%d%H%M%S%f')
     image_dir = f"Data/{folder_name}/Cam3/"

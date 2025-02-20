@@ -58,7 +58,6 @@ class Camera(object):
         # 根据 FriendlyName 查找目标相机
         target_camera_info = None
         for DevInfo in self.DevList:
-            print(DevInfo.GetFriendlyName() == self.friendly_name)
             if DevInfo.GetFriendlyName() == self.friendly_name:
                 target_camera_info = DevInfo
                 break
@@ -66,7 +65,7 @@ class Camera(object):
         # 打开相机
         self.hCamera = 0
         try:
-            self.hCamera = mvsdk.CameraInit(DevInfo, -1, -1)
+            self.hCamera = mvsdk.CameraInit(target_camera_info, -1, -1)
         except mvsdk.CameraException as e:
             print("CameraInit Failed({}): {}".format(e.error_code, e.message))
             return

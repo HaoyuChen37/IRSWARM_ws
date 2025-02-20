@@ -7,6 +7,6 @@
   <node name="cam4" pkg="cam" type="cam4.py" output="screen"/>
 
   <!-- 启动控制小车的节点 -->
-  <node name="auto_control" pkg="cam" type="auto_control.py" output="screen"/>
+  <!-- <node name="auto_control" pkg="cam" type="auto_control.py" output="screen"/> -->
 
 </launch>
