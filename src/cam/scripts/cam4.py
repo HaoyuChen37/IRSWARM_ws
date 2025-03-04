@@ -19,10 +19,8 @@ import time
 Cam_ID = 20
 
 class Camera(object):
-    def __init__(self, Cam_ID, width=1280, height=720, fps=100):
+    def __init__(self, Cam_ID):
         rospy.init_node('Cam4_node', anonymous=True)
-        self.width = width
-        self.height = height
         self.bridge = CvBridge()
         self.light_pub = rospy.Publisher('/Cam4', Cam4, queue_size=100)
         # initialize camera parameters
@@ -31,7 +29,6 @@ class Camera(object):
         self.FrameBufferSize = 0
         self.pFrameBuffer = None
         self.shutter = [10000, 5000, 2500, 1250, 625, 312, 156, 78, 39, 19, 9, 5, 2, 1]
-        self.fps = fps
         self.exposure = 732
         self.pixel_sum = []
         self.pixel_loc = []
@@ -114,7 +111,7 @@ class Camera(object):
         frame = frame.reshape(
             (FrameHead.iHeight, FrameHead.iWidth, 1 if FrameHead.uiMediaType == mvsdk.CAMERA_MEDIA_TYPE_MONO8 else 3))
 
-        frame = cv2.resize(frame, (640, 480), interpolation=cv2.INTER_LINEAR)
+        frame = cv2.resize(frame, (1280, 1024), interpolation=cv2.INTER_LINEAR)
         # cv2.imshow("Press q to end", frame)
 
         return frame
