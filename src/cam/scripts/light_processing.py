@@ -147,7 +147,8 @@ class LightLocalizer():
             'calculated_loc': [],
             'pixel_sum': [],
             'pixel_loc': [],
-            'cam_exp': []
+            'cam_exp': [],
+            'env_value': []
         }
 
     def car1_callback(self, msg):
@@ -260,43 +261,50 @@ class LightLocalizer():
         return projections
 
     def process_roi(self, frame, roi_mask):
-            """在ROI区域内处理图像并返回光源信息"""
-            # 应用ROI掩膜
-            masked_frame = cv2.bitwise_and(frame, frame, mask=roi_mask)
-            
-            # 计算图像的平均像素值（仅在ROI区域内）
-            frame_mean = cv2.mean(frame)[0]
-            
-            # 动态调整阈值
-            threshold = 2 * frame_mean
-            _, binary = cv2.threshold(masked_frame, threshold, 255, cv2.THRESH_BINARY)
-            
-            # 查找轮廓
-            contours, _ = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-            
-            centers = []
-            pixel_sums = []
-            
-            for contour in contours:
-                # 轮廓面积过滤
-                area = cv2.contourArea(contour)
-                if 4 < area < 80:
-                    # 计算质心
-                    M = cv2.moments(contour)
-                    if M["m00"] != 0:
-                        cx = int(M["m10"] / M["m00"])
-                        cy = int(M["m01"] / M["m00"])
-                        
-                        # 计算每个亮点的像素值总和
-                        mask = np.zeros_like(frame)
-                        cv2.drawContours(mask, [contour], -1, 255, -1)
-                        masked_image = cv2.bitwise_and(frame, frame, mask=mask)
-                        pixel_sum = cv2.sumElems(masked_image)[0]
-                        
-                        centers.append((cx, cy))
-                        pixel_sums.append(pixel_sum)
-            
-            return centers, pixel_sums
+        """在ROI区域内处理图像并返回光源信息"""
+        # 应用ROI掩膜
+        masked_frame = cv2.bitwise_and(frame, frame, mask=roi_mask)
+        
+        # 计算图像的平均像素值（仅在ROI区域内）
+        frame_mean = cv2.mean(frame)[0]
+        
+        # 动态调整阈值
+        threshold = 2 * frame_mean
+        _, binary = cv2.threshold(masked_frame, threshold, 255, cv2.THRESH_BINARY)
+        
+        # 创建相反蒙版
+        inverted_binary = cv2.bitwise_not(binary)
+        
+        # 计算相反蒙版区域的平均像素值
+        # 使用掩膜计算平均值
+        mean_outside_roi = cv2.mean(frame, mask=inverted_binary)[0]
+        
+        # 查找轮廓
+        contours, _ = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        
+        centers = []
+        pixel_sums = []
+        
+        for contour in contours:
+            # 轮廓面积过滤
+            area = cv2.contourArea(contour)
+            if 4 < area < 80:
+                # 计算质心
+                M = cv2.moments(contour)
+                if M["m00"] != 0:
+                    cx = int(M["m10"] / M["m00"])
+                    cy = int(M["m01"] / M["m00"])
+                    
+                    # 计算每个亮点的像素值总和
+                    mask = np.zeros_like(frame)
+                    cv2.drawContours(mask, [contour], -1, 255, -1)
+                    masked_image = cv2.bitwise_and(frame, frame, mask=mask)
+                    pixel_sum = cv2.sumElems(masked_image)[0]
+                    
+                    centers.append((cx, cy))
+                    pixel_sums.append(pixel_sum)
+        
+        return centers, pixel_sums, mean_outside_roi
     
     def process_frame_with_vicon(self, frame, car_id, cam_id):
         """完整的定位流程"""
@@ -310,16 +318,16 @@ class LightLocalizer():
         cv2.imshow('mask', roi_mask)
 
         # 处理ROI区域
-        centers, pixel_sums = self.process_roi(frame, roi_mask)
-        return centers, pixel_sums
+        centers, pixel_sums, env_value = self.process_roi(frame, roi_mask)
+        return centers, pixel_sums, env_value
     
     def process_frame_without_vicon(self, frame):
         """完整的定位流程"""
         roi_mask = self.create_full_image_mask(frame.shape)
 
         # 处理ROI区域
-        centers, pixel_sums = self.process_roi(frame, roi_mask)
-        return centers, pixel_sums
+        centers, pixel_sums, env_value = self.process_roi(frame, roi_mask)
+        return centers, pixel_sums, env_value
     
 
     def pixel_sum_to_distance(self, pixel_sum, exposure):
@@ -360,7 +368,7 @@ class LightLocalizer():
 
         return p_car
     
-    def reproject(self, pixel_loc, pixel_sum, exposure, cam_id, savedata):
+    def reproject(self, pixel_loc, pixel_sum, exposure, env_calue, cam_id, savedata):
         lights = []
         loc = []
         dis = []
@@ -374,10 +382,11 @@ class LightLocalizer():
             dis.append(distance)
 
         if savedata:
-            self.savedata(pixel_loc, pixel_sum, exposure, loc, dis)
+            self.savedata(pixel_loc, pixel_sum, exposure, loc, dis, env_calue)
         return lights
     
-    def savedata(self, pixel_loc, pixel_sum, exposure, location, calculated_dis):
+    def savedata(self, pixel_loc, pixel_sum, exposure, location, calculated_dis, env_calue):
+        # 保存数据到字典中
         t = int(str(rospy.Time.now().to_nsec()))
         self.true_data['time'].append(t)
         self.true_data['car1_pose'].append(self.T_car1_to_vicon)
@@ -391,6 +400,7 @@ class LightLocalizer():
         self.true_data['pixel_sum'].append(pixel_sum)
         self.true_data['pixel_loc'].append(pixel_loc)
         self.true_data['cam_exp'].append(exposure)
+        self.true_data['env_value'].append(env_calue)
         
 
 def main():

@@ -32,6 +32,7 @@ class Camera(object):
         self.exposure = 732
         self.pixel_sum = []
         self.pixel_loc = []
+        self.env_calue = 0
         self.frame_ave_value = 0
         self.frame_max_value = 0
         # Initialize car_id, cam_id
@@ -163,12 +164,12 @@ class Camera(object):
     def mask(self, frame, localizer, with_vicon = 0, savedata = False):
         if with_vicon == 0:
             # 调用 process_frame_without_vicon 方法
-            self.pixel_loc, self.pixel_sum = localizer.process_frame_without_vicon(frame)
+            self.pixel_loc, self.pixel_sum, self.env_calue = localizer.process_frame_without_vicon(frame)
         else:
-            self.pixel_loc, self.pixel_sum = localizer.process_frame_with_vicon(frame, self.car_id, self.cam_id)
+            self.pixel_loc, self.pixel_sum, self.env_calue = localizer.process_frame_with_vicon(frame, self.car_id, self.cam_id)
 
         # reproject method
-        lights = localizer.reproject(self.pixel_loc, self.pixel_sum, self.exposure, self.cam_id, savedata)
+        lights = localizer.reproject(self.pixel_loc, self.pixel_sum, self.exposure, self.env_calue, self.cam_id, savedata)
 
         lights_info = Cam1(lights=lights)
         self.light_pub.publish(lights_info)
