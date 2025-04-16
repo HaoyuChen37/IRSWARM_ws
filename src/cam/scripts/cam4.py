@@ -13,10 +13,10 @@ from scipy.io import savemat
 from datetime import datetime
 from cam.msg import LightInfo, Cam4
 from light_processing import LightLocalizer
-import time
+import pdb
 
 
-Cam_ID = 20
+Cam_ID = 16
 
 class Camera(object):
     def __init__(self, Cam_ID):
@@ -32,6 +32,7 @@ class Camera(object):
         self.exposure = 732
         self.pixel_sum = []
         self.pixel_loc = []
+        self.env_calue = 0
         self.frame_ave_value = 0
         self.frame_max_value = 0
         # Initialize car_id, cam_id
@@ -58,7 +59,6 @@ class Camera(object):
             if DevInfo.GetFriendlyName() == self.friendly_name:
                 target_camera_info = DevInfo
                 break
-
 
         # 打开相机
         self.hCamera = 0
@@ -117,7 +117,7 @@ class Camera(object):
         return frame
 
     def exposure_adjustment(self, low=1, high=100000):
-        target_pixel_value = 220
+        target_pixel_value = 250
 
         exposure_time = (low + high) // 2
         mvsdk.CameraSetExposureTime(self.hCamera, exposure_time)
@@ -164,12 +164,12 @@ class Camera(object):
     def mask(self, frame, localizer, with_vicon = 0, savedata = False):
         if with_vicon == 0:
             # 调用 process_frame_without_vicon 方法
-            self.pixel_loc, self.pixel_sum = localizer.process_frame_without_vicon(frame)
+            self.pixel_loc, self.pixel_sum, self.env_calue = localizer.process_frame_without_vicon(frame)
         else:
-            self.pixel_loc, self.pixel_sum = localizer.process_frame_with_vicon(frame, self.car_id, self.cam_id)
+            self.pixel_loc, self.pixel_sum, self.env_calue = localizer.process_frame_with_vicon(frame, self.car_id, self.cam_id)
 
         # reproject method
-        lights = localizer.reproject(self.pixel_loc, self.pixel_sum, self.exposure, self.cam_id, savedata)
+        lights = localizer.reproject(self.pixel_loc, self.pixel_sum, self.exposure, self.env_calue, self.cam_id, savedata)
 
         lights_info = Cam4(lights=lights)
         self.light_pub.publish(lights_info)
@@ -184,7 +184,6 @@ class Camera(object):
 
 
 if __name__ == '__main__':
-    time.sleep(3)
     cam = Camera(Cam_ID)
     # folder_name = input('input the folder name:')
     folder_name = datetime.now().strftime('%m%d%H%M%S%f')

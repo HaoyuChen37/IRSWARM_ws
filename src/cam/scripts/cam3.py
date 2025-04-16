@@ -13,10 +13,10 @@ from scipy.io import savemat
 from datetime import datetime
 from cam.msg import LightInfo, Cam3
 from light_processing import LightLocalizer
-import time
+import pdb
 
 
-Cam_ID = 19
+Cam_ID = 15
 
 class Camera(object):
     def __init__(self, Cam_ID):
@@ -32,6 +32,7 @@ class Camera(object):
         self.exposure = 732
         self.pixel_sum = []
         self.pixel_loc = []
+        self.env_calue = 0
         self.frame_ave_value = 0
         self.frame_max_value = 0
         # Initialize car_id, cam_id
@@ -58,7 +59,6 @@ class Camera(object):
             if DevInfo.GetFriendlyName() == self.friendly_name:
                 target_camera_info = DevInfo
                 break
-
 
         # 打开相机
         self.hCamera = 0
@@ -100,28 +100,24 @@ class Camera(object):
         # mvsdk.CameraSetExposureTime(self.hCamera, self.exposure)
 
     def get_frame(self):
-        try:
-            pRawData, FrameHead = mvsdk.CameraGetImageBuffer(self.hCamera, 200)
-            mvsdk.CameraImageProcess(self.hCamera, pRawData, self.pFrameBuffer, FrameHead)
-            mvsdk.CameraReleaseImageBuffer(self.hCamera, pRawData)
+        pRawData, FrameHead = mvsdk.CameraGetImageBuffer(self.hCamera, 200)
+        mvsdk.CameraImageProcess(self.hCamera, pRawData, self.pFrameBuffer, FrameHead)
+        mvsdk.CameraReleaseImageBuffer(self.hCamera, pRawData)
 
-            # 此时图片已经存储在pFrameBuffer中，对于彩色相机pFrameBuffer=RGB数据，黑白相机pFrameBuffer=8位灰度数据
-            # 把pFrameBuffer转换成opencv的图像格式以进行后续算法处理
-            frame_data = (mvsdk.c_ubyte * FrameHead.uBytes).from_address(self.pFrameBuffer)
-            frame = np.frombuffer(frame_data, dtype=np.uint8)
-            frame = frame.reshape(
-                (FrameHead.iHeight, FrameHead.iWidth, 1 if FrameHead.uiMediaType == mvsdk.CAMERA_MEDIA_TYPE_MONO8 else 3))
+        # 此时图片已经存储在pFrameBuffer中，对于彩色相机pFrameBuffer=RGB数据，黑白相机pFrameBuffer=8位灰度数据
+        # 把pFrameBuffer转换成opencv的图像格式以进行后续算法处理
+        frame_data = (mvsdk.c_ubyte * FrameHead.uBytes).from_address(self.pFrameBuffer)
+        frame = np.frombuffer(frame_data, dtype=np.uint8)
+        frame = frame.reshape(
+            (FrameHead.iHeight, FrameHead.iWidth, 1 if FrameHead.uiMediaType == mvsdk.CAMERA_MEDIA_TYPE_MONO8 else 3))
 
-            frame = cv2.resize(frame, (1280, 1024), interpolation=cv2.INTER_LINEAR)
-            # cv2.imshow("Press q to end", frame)
-            # print(frame)
-            return frame
-        except mvsdk.CameraException as e:
-            if e.error_code != mvsdk.CAMERA_STATUS_TIME_OUT:
-                print("CameraGetImageBuffer failed({}): {}".format(e.error_code, e.message))
+        frame = cv2.resize(frame, (1280, 1024), interpolation=cv2.INTER_LINEAR)
+        # cv2.imshow("Press q to end", frame)
+
+        return frame
 
     def exposure_adjustment(self, low=1, high=100000):
-        target_pixel_value = 220
+        target_pixel_value = 250
 
         exposure_time = (low + high) // 2
         mvsdk.CameraSetExposureTime(self.hCamera, exposure_time)
@@ -168,12 +164,12 @@ class Camera(object):
     def mask(self, frame, localizer, with_vicon = 0, savedata = False):
         if with_vicon == 0:
             # 调用 process_frame_without_vicon 方法
-            self.pixel_loc, self.pixel_sum = localizer.process_frame_without_vicon(frame)
+            self.pixel_loc, self.pixel_sum, self.env_calue = localizer.process_frame_without_vicon(frame)
         else:
-            self.pixel_loc, self.pixel_sum = localizer.process_frame_with_vicon(frame, self.car_id, self.cam_id)
+            self.pixel_loc, self.pixel_sum, self.env_calue = localizer.process_frame_with_vicon(frame, self.car_id, self.cam_id)
 
         # reproject method
-        lights = localizer.reproject(self.pixel_loc, self.pixel_sum, self.exposure, self.cam_id, savedata)
+        lights = localizer.reproject(self.pixel_loc, self.pixel_sum, self.exposure, self.env_calue, self.cam_id, savedata)
 
         lights_info = Cam3(lights=lights)
         self.light_pub.publish(lights_info)
@@ -188,7 +184,6 @@ class Camera(object):
 
 
 if __name__ == '__main__':
-    time.sleep(2)
     cam = Camera(Cam_ID)
     # folder_name = input('input the folder name:')
     folder_name = datetime.now().strftime('%m%d%H%M%S%f')
