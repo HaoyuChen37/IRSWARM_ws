@@ -129,8 +129,7 @@ class LightLocalizer():
         self.car4_sub = rospy.Subscriber("/vicon/IRSWARM4/IRSWARM4", TransformStamped, self.car4_callback)
         self.car5_sub = rospy.Subscriber("/vicon/IRSWARM5/IRSWARM5", TransformStamped, self.car5_callback)
 
-        self.k = 1487.3
-        self.b = 1191.2
+        self.k = 30887
 
         self.dis1_2 = 0
 
@@ -288,7 +287,7 @@ class LightLocalizer():
         for contour in contours:
             # 轮廓面积过滤
             area = cv2.contourArea(contour)
-            if 4 < area < 80:
+            if 4 < area < 10000:
                 # 计算质心
                 M = cv2.moments(contour)
                 if M["m00"] != 0:
@@ -330,13 +329,13 @@ class LightLocalizer():
         return centers, pixel_sums, env_value
     
 
-    def pixel_sum_to_distance(self, pixel_sum, exposure):
+    def pixel_sum_to_distance(self, pixel_sum, exposure, env_calue):
         """基于光强衰减模型的距离估计"""
         # 计算接收光强 (考虑相机响应模型)
         # 根据平方反比定律计算距离
-        if pixel_sum - self.b < 0:
+        if pixel_sum - env_calue < 0:
              print("negative!!!")
-        distance = np.sqrt(self.k / ((pixel_sum / (exposure/732) ) - self.b) )  
+        distance = np.sqrt(self.k / ((pixel_sum- env_calue) / (exposure/732) ) )  
         return distance
     
     def pixel_to_car_coordinates(self, u, v, distance, cam_id):
@@ -373,7 +372,7 @@ class LightLocalizer():
         loc = []
         dis = []
         for i, (u, v) in enumerate(pixel_loc):
-            distance = self.pixel_sum_to_distance(pixel_sum[i], exposure)
+            distance = self.pixel_sum_to_distance(pixel_sum[i], exposure, env_calue)
             p_car = self.pixel_to_car_coordinates(u, v, distance, cam_id)
             lights.append(LightInfo(x=p_car[0], y=p_car[1], distance=distance))
             print(f'x={p_car[0]}, y={p_car[1]}, distance={distance}')
