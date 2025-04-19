@@ -14,6 +14,7 @@ from datetime import datetime
 from cam.msg import LightInfo, Cam3
 from light_processing import LightLocalizer
 import pdb
+import time
 
 
 Cam_ID = 15
@@ -184,6 +185,7 @@ class Camera(object):
 
 
 if __name__ == '__main__':
+    time.sleep(2)
     cam = Camera(Cam_ID)
     # folder_name = input('input the folder name:')
     folder_name = datetime.now().strftime('%m%d%H%M%S%f')
