@@ -364,8 +364,9 @@ class LightLocalizer():
         # 从相机坐标系转换到小车坐标系
         p_cam = np.append(p_cam, 1)
         p_car = T_camera_to_car[cam_id].dot(p_cam)
+        g_car = np.linalg.norm(np.array([p_car[0], p_car[1]]))
 
-        return p_car
+        return g_car
     
     def reproject(self, pixel_loc, pixel_sum, exposure, env_calue, cam_id, savedata):
         lights = []
