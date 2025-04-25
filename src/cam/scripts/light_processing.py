@@ -307,14 +307,17 @@ class LightLocalizer():
     
     def process_frame_with_vicon(self, frame, car_id, cam_id):
         """完整的定位流程"""
+        if frame.max() > 250:
+            print("frame max value is too high")
+            return None, None, None
         # 获取投影点
         projected_pt = self.project_all_lights_to_image(car_id, cam_id)
 
         # 创建ROI掩膜
         roi_mask = self.create_roi_mask(projected_pt, frame.shape)
 
-        cv2.imshow('frame', frame)
-        cv2.imshow('mask', roi_mask)
+        # cv2.imshow('frame', frame)
+        # cv2.imshow('mask', roi_mask)
 
         # 处理ROI区域
         centers, pixel_sums, env_value = self.process_roi(frame, roi_mask)
