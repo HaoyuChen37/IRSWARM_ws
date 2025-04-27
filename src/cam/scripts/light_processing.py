@@ -129,7 +129,8 @@ class LightLocalizer():
         self.car4_sub = rospy.Subscriber("/vicon/IRSWARM4/IRSWARM4", TransformStamped, self.car4_callback)
         self.car5_sub = rospy.Subscriber("/vicon/IRSWARM5/IRSWARM5", TransformStamped, self.car5_callback)
 
-        self.k = 30887
+        # self.k = 30887
+        self.k = 20000
 
         self.dis1_2 = 0
 
@@ -153,7 +154,7 @@ class LightLocalizer():
     def car1_callback(self, msg):
         # vicon消息
         self.T_car1_to_vicon = get_homogenious(msg.transform.rotation, msg.transform.translation)
-        self.dis1_2 = record_distance(self.T_car1_to_vicon[0:3, 3], self.T_car2_to_vicon[0:3, 3])
+        self.dis1_2 = record_distance(self.T_car1_to_vicon[0:3, 3], self.T_car5_to_vicon[0:3, 3])
         # print('recieved car1 pose')
         
 
