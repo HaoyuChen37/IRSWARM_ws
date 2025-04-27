@@ -17,7 +17,7 @@ import pdb
 import time
 
 
-Cam_ID = 16
+Cam_ID = 8
 
 class Camera(object):
     def __init__(self, Cam_ID):
