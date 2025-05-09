@@ -60,26 +60,29 @@ M_cam2hand = [
 
 # 相机到小车转换矩阵
 a = 0.04054 * m.sin(m.pi/4)
+'''
+发现方向反了，所有角度加pi
+'''
 T_camera_to_car = [
-    np.array([[m.cos(m.pi/4),  m.sin(m.pi/4), 0,      a], # yaw = -pi/4
-             [-m.sin(m.pi/4),  m.cos(m.pi/4), 0,     -a],
+    np.array([[m.cos(3*m.pi/4),  m.sin(3*m.pi/4), 0,      a], # yaw = 3pi/4
+             [-m.sin(3*m.pi/4),  m.cos(3*m.pi/4), 0,     -a],
              [0            ,   0            , 1,     0],
              [0            ,   0            , 0,     1]]),
 
-    np.array([[m.cos(-m.pi/4),  m.sin(-m.pi/4), 0,    a], # yaw = pi/4
-             [-m.sin(-m.pi/4),  m.cos(-m.pi/4), 0,    a],
+    np.array([[m.cos(5*m.pi/4),  m.sin(5*m.pi/4), 0,    a], # yaw = 5pi/4
+             [-m.sin(5*m.pi/4),  m.cos(5*m.pi/4), 0,    a],
              [0             ,   0             , 1,    0],
              [0             ,   0             , 0,    1]]),
 
-    np.array([[m.cos(-3*m.pi/4), m.sin(-3*m.pi/4), 0,   -a], # yaw = 3pi/4
-             [-m.sin(-3*m.pi/4), m.cos(-3*m.pi/4), 0,    a],
+    np.array([[m.cos(7*m.pi/4), m.sin(7*m.pi/4), 0,   -a], # yaw = 7pi/4
+             [-m.sin(7*m.pi/4), m.cos(7*m.pi/4), 0,    a],
              [0               ,   0               , 1,    0],
              [0               ,   0               , 0,    1]]),
 
-    np.array([[m.cos(3*m.pi/4), -m.sin(3*m.pi/4), 0,    -a], # yaw = -3pi/4
-             [-m.sin(3*m.pi/4),  m.cos(3*m.pi/4), 0,    -a],
+    np.array([[m.cos(9*m.pi/4), -m.sin(9*m.pi/4), 0,    -a], # yaw = 9pi/4
+             [-m.sin(9*m.pi/4),  m.cos(9*m.pi/4), 0,    -a],
              [0              ,   0              , 1,     0],
-             [0              ,   0              , 0,     1]]),
+             [0              ,   0              , 0,     1]])
 ]
 
 
