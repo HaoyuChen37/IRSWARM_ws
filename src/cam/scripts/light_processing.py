@@ -130,7 +130,7 @@ class LightLocalizer():
         self.car5_sub = rospy.Subscriber("/vicon/IRSWARM5/IRSWARM5", TransformStamped, self.car5_callback)
 
         # self.k = 30887
-        self.k = 20000
+        self.k = 15000
 
         self.dis1_2 = 0
 
