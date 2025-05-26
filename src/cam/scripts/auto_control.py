@@ -2,98 +2,157 @@
 # -*- coding: utf-8 -*-
 import rospy
 from cam.msg import Cam1, Cam2, Cam3, Cam4
-from geometry_msgs.msg import Twist  # 导入Twist消息类型用于速度控制
-import logging
+from geometry_msgs.msg import Twist
+import numpy as np
 
-rospy.init_node('lights_info_subscriber', anonymous=True)
+rospy.init_node('simple_flocking_controller', anonymous=True)
 
-# 设置日志文件路径
-log_file_path = "Data/logfile.log"
-logging.basicConfig(filename=log_file_path, level=logging.INFO)
+# 简化的Flocking参数
+SEPARATION_DISTANCE = 0.8    # 分离距离
+ALIGNMENT_DISTANCE = 1.5     # 对齐距离  
+COHESION_DISTANCE = 2.0      # 聚集距离
 
+SEPARATION_WEIGHT = 2.0      # 分离权重（最重要，避免碰撞）
+ALIGNMENT_WEIGHT = 1.0       # 对齐权重
+COHESION_WEIGHT = 0.8        # 聚集权重
 
-# 定义全局变量
-lights_data = {'Cam1': [], 'Cam2': [], 'Cam3': [], 'Cam4': []}  # 存储四个相机的数据
-MAX_SPEED = 0.5  # 最大速度限制
-MIN_DISTANCE = 0.5  # 最小安全距离
-CAMERA_COUNT = 4  # 相机数量
+MAX_SPEED = 0.5              # 最大速度
 
-# 回调函数：处理相机数据
-def callback(data, cam_id):
-    # rospy.loginfo(f"Received data from {cam_id}:")
-    lights_list = []
+# 全局变量
+all_neighbors = []           # 存储所有邻居
+velocity_publisher = None
 
+def update_neighbors(data, cam_id):
+    """更新邻居信息"""
+    global all_neighbors
+    
+    # 清空当前相机的数据
+    all_neighbors = [n for n in all_neighbors if n['cam'] != cam_id]
+    
+    # 添加新数据
     for light in data.lights:
-        light_dict = {
+        neighbor = {
             'x': light.x,
-            'y': light.y,
-            'distance': light.distance
+            'y': light.y, 
+            'distance': light.distance,
+            'vel_x': getattr(light, 'velocity_x', 0),
+            'vel_y': getattr(light, 'velocity_y', 0),
+            'cam': cam_id
         }
-        lights_list.append(light_dict)
+        all_neighbors.append(neighbor)
 
-    lights_data[cam_id] = lights_list
-    # rospy.loginfo(f"Updated lights_data for {cam_id}: {lights_data[cam_id]}")
+def calculate_separation():
+    """计算分离力 - 远离太近的邻居"""
+    sep_x, sep_y = 0, 0
+    count = 0
+    
+    for neighbor in all_neighbors:
+        dist = neighbor['distance']
+        if 0 < dist < SEPARATION_DISTANCE:
+            # 计算远离方向（相反方向）
+            sep_x -= neighbor['x'] / dist  # 归一化并反向
+            sep_y -= neighbor['y'] / dist
+            count += 1
+    
+    if count > 0:
+        sep_x /= count
+        sep_y /= count
+        
+    return sep_x * SEPARATION_WEIGHT, sep_y * SEPARATION_WEIGHT
 
-    # 每次接收到相机数据后计算并发布速度
-    calculate_and_publish_velocity()
+def calculate_alignment():
+    """计算对齐力 - 与邻居速度保持一致"""
+    align_x, align_y = 0, 0
+    count = 0
+    
+    for neighbor in all_neighbors:
+        if neighbor['distance'] < ALIGNMENT_DISTANCE:
+            align_x += neighbor['vel_x']
+            align_y += neighbor['vel_y'] 
+            count += 1
+    
+    if count > 0:
+        align_x /= count
+        align_y /= count
+        
+    return align_x * ALIGNMENT_WEIGHT, align_y * ALIGNMENT_WEIGHT
 
-# 计算速度
-def calculate_velocity():
-    global lights_data
-    vel = (0, 0)
-    p = 1.0  # 比例系数
-    dis = 1.0  # 目标距离
+def calculate_cohesion():
+    """计算聚集力 - 向邻居中心移动"""
+    cohes_x, cohes_y = 0, 0
+    count = 0
+    
+    for neighbor in all_neighbors:
+        if neighbor['distance'] < COHESION_DISTANCE:
+            cohes_x += neighbor['x']
+            cohes_y += neighbor['y']
+            count += 1
+    
+    if count > 0:
+        cohes_x /= count
+        cohes_y /= count
+        
+    return cohes_x * COHESION_WEIGHT, cohes_y * COHESION_WEIGHT
 
-    for cam_id, lights in lights_data.items():
-        for light in lights:
-            distance = light['distance']
-            if distance < MIN_DISTANCE:
-                rospy.logwarn(f"Target too close in {cam_id}! Distance: {distance}")
-                continue
-
-            # 调整速度计算公式
-            vel = (
-                vel[0] + p * light['x'] * (distance - dis),  # 注意负号
-                vel[1] + p * light['y'] * (distance - dis)
-            )
-
-    # 限制速度
-    speed = (vel[0]**2 + vel[1]**2)**0.5
+def calculate_flocking_velocity():
+    """计算最终的flocking速度"""
+    if not all_neighbors:
+        return 0, 0
+    
+    # 计算三个flocking力
+    sep_x, sep_y = calculate_separation()
+    align_x, align_y = calculate_alignment() 
+    cohes_x, cohes_y = calculate_cohesion()
+    
+    # 合并所有力
+    total_x = sep_x + align_x + cohes_x
+    total_y = sep_y + align_y + cohes_y
+    
+    # 限制最大速度
+    speed = np.sqrt(total_x**2 + total_y**2)
     if speed > MAX_SPEED:
-        vel = (vel[0] / speed * MAX_SPEED, vel[1] / speed * MAX_SPEED)
+        total_x = total_x / speed * MAX_SPEED
+        total_y = total_y / speed * MAX_SPEED
+    
+    return total_x, total_y
 
-    return vel
-
-# 发布速度指令
-def publish_velocity(velocity):
+def callback(data, cam_id):
+    """相机数据回调"""
+    update_neighbors(data, cam_id)
+    
+    # 计算并发布速度
+    vel_x, vel_y = calculate_flocking_velocity()
+    
+    # 发布速度指令
     velocity_msg = Twist()
-    velocity_msg.linear.x = velocity[0]
-    velocity_msg.linear.y = velocity[1]
+    velocity_msg.linear.x = vel_x
+    velocity_msg.linear.y = vel_y
     velocity_publisher.publish(velocity_msg)
-    # rospy.loginfo(f"Published velocity command: Linear x={velocity[0]}, y={velocity[1]}")
+    
+    # 简单的状态日志
+    neighbor_count = len(all_neighbors)
+    current_speed = np.sqrt(vel_x**2 + vel_y**2)
+    rospy.loginfo(f"Neighbors: {neighbor_count}, Speed: {current_speed:.3f}")
 
-# 计算并发布速度
-def calculate_and_publish_velocity():
-    vel = calculate_velocity()
-    publish_velocity(vel)
-
-# 初始化订阅者和发布者
-def lights_info_subscriber():
+def main():
+    """主函数"""
     global velocity_publisher
-    rospy.init_node('lights_info_subscriber', anonymous=True)
+    
+    # 初始化发布者
     velocity_publisher = rospy.Publisher('/robot/velcmd', Twist, queue_size=10)
-
-    # 订阅四个相机的数据
+    
+    # 订阅四个相机
     rospy.Subscriber('/Cam1', Cam1, lambda data: callback(data, 'Cam1'))
     rospy.Subscriber('/Cam2', Cam2, lambda data: callback(data, 'Cam2'))
     rospy.Subscriber('/Cam3', Cam3, lambda data: callback(data, 'Cam3'))
     rospy.Subscriber('/Cam4', Cam4, lambda data: callback(data, 'Cam4'))
-
+    
+    rospy.loginfo("Simple Flocking Controller Started")
+    rospy.loginfo("Rules: Separation + Alignment + Cohesion")
     rospy.spin()
 
 if __name__ == '__main__':
     try:
-        lights_info_subscriber()
-        # calculate_and_publish_velocity()
+        main()
     except rospy.ROSInterruptException:
         pass
